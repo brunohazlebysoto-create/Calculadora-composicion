@@ -187,6 +187,22 @@ footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-
 </section>
 
 <section class="card s12">
+<h2>4) Análisis y sugerencias</h2>
+<h3>Lectura automática (fórmulas biométricas)</h3>
+<div id="localAnalysis" class="help">Guarda al menos una medición para ver el análisis.</div>
+
+<h3>Análisis con IA (Gemini, opcional)</h3>
+<p class="help">Envía los mismos datos (los que ya ves arriba: composición, perímetros, tendencia) a la <b>API de Gemini</b> de Google para obtener una interpretación en lenguaje natural y sugerencias personalizadas. Necesitas tu propia clave de API (gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>). La clave se guarda solo en este navegador (no se incluye en el respaldo .json) y la llamada va directa de tu navegador a Google.</p>
+<div class="form" style="grid-template-columns:2fr 1fr">
+  <div><label>Clave de API de Gemini</label><input id="geminiKey" type="password" placeholder="AIza…" autocomplete="off"></div>
+  <div><label>Modelo</label><input id="geminiModel" type="text" placeholder="gemini-2.5-flash"></div>
+</div>
+<div class="actions"><button id="analyzeAI">Analizar con IA</button></div>
+<div id="aiStatus" class="status hidden"></div>
+<div id="aiResult"></div>
+</section>
+
+<section class="card s12">
 <h2>Historial</h2>
 <div class="scroll"><table><thead><tr>
 <th>Fecha</th><th>Peso</th><th>Grasa kg</th><th>Grasa %</th><th>Músculo kg</th><th>RFM %</th><th>Perímetros %</th><th>Combinada %</th><th>Cintura</th><th>Cadera</th><th>Visceral</th><th>Score</th><th></th>
@@ -218,6 +234,8 @@ const $=x=>document.getElementById(x),
       OLD_KEYS=["fitdays8e_v5_records","fitdays8e_v4_records","fitdays8e_v2_records"],
       SETTINGS_KEY="fitdays8e_v6_settings",
       OLD_SETTINGS_KEYS=["fitdays8e_v5_settings"],
+      GEMINI_KEY_STORAGE="fitdays8e_v6_gemini_key",
+      GEMINI_MODEL_STORAGE="fitdays8e_v6_gemini_model",
       APP_VERSION="6.0";
 const SEG=["Brazo derecho","Brazo izquierdo","Tronco","Pierna derecha","Pierna izquierda"];
 const SEGKEY=["ra","la","trunk","rl","ll"];
@@ -285,6 +303,135 @@ function navyBodyFat(r){
  }
  if(!Number.isFinite(val)) return null;
  return Math.max(2,Math.min(65,val));
+}
+
+function bmiCategory(bmi){
+ if(!Number.isFinite(bmi))return null;
+ if(bmi<18.5)return"bajo peso";
+ if(bmi<25)return"normopeso";
+ if(bmi<30)return"sobrepeso";
+ if(bmi<35)return"obesidad grado I";
+ if(bmi<40)return"obesidad grado II";
+ return"obesidad grado III";
+}
+function whtrCategory(whtr){
+ if(!Number.isFinite(whtr))return null;
+ if(whtr<0.5)return"riesgo cardiometabólico bajo";
+ if(whtr<0.6)return"riesgo aumentado";
+ return"riesgo alto";
+}
+function whrCategory(whr,sex){
+ if(!Number.isFinite(whr))return null;
+ const cut=sex==="F"?0.85:0.90;
+ return whr<cut?"distribución de grasa normal":"distribución de grasa androide (riesgo aumentado)";
+}
+function visceralCategory(v){
+ if(!Number.isFinite(v))return null;
+ if(v<10)return"normal";
+ if(v<15)return"alta";
+ return"muy alta";
+}
+function bodyFatCategory(pct,sex){
+ if(!Number.isFinite(pct))return null;
+ const bandsM=[[0,5,"grasa esencial"],[5,14,"atlético"],[14,18,"fitness"],[18,25,"aceptable"],[25,999,"obesidad"]];
+ const bandsF=[[0,13,"grasa esencial"],[13,21,"atlético"],[21,25,"fitness"],[25,32,"aceptable"],[32,999,"obesidad"]];
+ const bands=sex==="F"?bandsF:bandsM;
+ for(const [lo,hi,label] of bands) if(pct>=lo&&pct<hi) return label;
+ return"obesidad";
+}
+function buildLocalAnalysis(rs){
+ if(!rs.length) return'<p class="help">Guarda al menos una medición para ver el análisis.</p>';
+ const last=rs.at(-1),prev=rs.length>1?rs.at(-2):null;
+ const li=[];
+ if(Number.isFinite(last.bmi)) li.push(`IMC ${f(last.bmi,1)} → <b>${bmiCategory(last.bmi)}</b>.`);
+ if(Number.isFinite(last.whtr)) li.push(`Cintura/altura ${f(last.whtr,3)} → <b>${whtrCategory(last.whtr)}</b>.`);
+ if(Number.isFinite(last.whrCirc)) li.push(`Cintura/cadera medida ${f(last.whrCirc,3)} → <b>${whrCategory(last.whrCirc,last.sex)}</b>.`);
+ if(Number.isFinite(last.visceral)) li.push(`Grasa visceral ${f(last.visceral,0)} → <b>${visceralCategory(last.visceral)}</b>.`);
+ if(Number.isFinite(last.bodyFat)) li.push(`Grasa corporal Fitdays ${f(last.bodyFat,1)}% → <b>${bodyFatCategory(last.bodyFat,last.sex)}</b>.`);
+ if(Number.isFinite(last.combined)) li.push(`Estimación combinada (Fitdays+RFM+perímetros) ${f(last.combined,1)}% → <b>${bodyFatCategory(last.combined,last.sex)}</b>.`);
+ const trend=(key,label,unit)=>{
+  if(prev&&Number.isFinite(prev[key])&&Number.isFinite(last[key])){
+   const d=last[key]-prev[key];
+   const days=Math.max(1,(new Date(last.date)-new Date(prev.date))/864e5);
+   const perWeek=d/days*7;
+   if(Math.abs(d)>=0.05) li.push(`${label}: ${d>=0?"+":""}${d.toFixed(1)} ${unit} desde la medición anterior (${perWeek>=0?"+":""}${perWeek.toFixed(2)} ${unit}/semana).`);
+  }
+ };
+ trend("weight","Peso","kg");trend("fatKg","Grasa","kg");trend("muscleKg","Músculo","kg");trend("waist","Cintura","cm");
+ const asym=(a,b,label)=>{
+  if(Number.isFinite(last[a])&&Number.isFinite(last[b])&&last[a]+last[b]>0){
+   const diff=Math.abs(last[a]-last[b])/((last[a]+last[b])/2)*100;
+   if(diff>15) li.push(`Asimetría ${label} de ${diff.toFixed(0)}% entre lado derecho e izquierdo: revisa la postura al medir o considera si es real.`);
+  }
+ };
+ asym("sf_ra","sf_la","de grasa en brazos");asym("sm_rl","sm_ll","de músculo en piernas");
+ if(!li.length) return'<p class="help">Añade más datos (peso, cintura, grasa corporal…) para ver el análisis.</p>';
+ return'<ul style="padding-left:18px;margin:0">'+li.map(x=>`<li class="help" style="margin-bottom:5px">${x}</li>`).join("")+'</ul>'
+  +(rs.length<2?'<p class="help" style="margin-top:8px">Guarda al menos dos mediciones para ver tendencias.</p>':"");
+}
+function escapeHtml(s){return(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function mdToHtml(text){
+ let t=escapeHtml(text);
+ t=t.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+ t=t.replace(/^#{1,3} (.*)$/gm,"\n\n<h4>$1</h4>\n\n");
+ t=t.replace(/^[-*] (.*)$/gm,"<li>$1</li>");
+ t=t.replace(/(<li>[\s\S]*?<\/li>\n?)+/g,m=>"\n\n<ul style=\"padding-left:18px\">"+m+"</ul>\n\n");
+ t=t.split(/\n{2,}/).map(p=>p.trim()).filter(Boolean).map(p=>/^<(h4|ul)/.test(p)?p:`<p class="help">${p.replace(/\n/g,"<br>")}</p>`).join("");
+ return t;
+}
+function buildGeminiPrompt(rs){
+ const last=rs.at(-1),prev=rs.length>1?rs.at(-2):null,first=rs[0];
+ const line=(label,val,unit="",dec)=>Number.isFinite(val)?`${label}: ${dec!=null?val.toFixed(dec):val}${unit}\n`:"";
+ let p=`Eres un asistente que interpreta datos de composición corporal de una báscula de bioimpedancia (Fitdays, 8 electrodos, 20 y 100 kHz) junto con perímetros corporales medidos a mano. Responde en español, tono claro y cercano, sin jerga médica innecesaria. No des diagnósticos médicos; si algún valor amerita consulta médica (por ejemplo grasa visceral muy alta o IMC en rango de obesidad), dilo con cuidado y sugiere consultar a un profesional de la salud.\n\n`;
+ p+=`PERFIL:\nSexo: ${last.sex==="F"?"Mujer":"Hombre"}\n`;
+ p+=line("Edad",last.age," años",0);
+ p+=line("Altura",last.height," cm",1);
+ p+=`\nÚLTIMA MEDICIÓN (${last.date}):\n`;
+ p+=line("Peso",last.weight," kg",1);
+ p+=line("IMC",last.bmi,"",1);
+ p+=line("Grasa corporal (Fitdays)",last.bodyFat,"%",1);
+ p+=line("Grasa corporal (RFM, cintura/altura)",last.rfm,"%",1);
+ p+=line("Grasa corporal (perímetros, método Navy)",last.navyFat,"%",1);
+ p+=line("Grasa corporal combinada",last.combined,"%",1);
+ p+=line("Masa muscular",last.muscleKg," kg",1);
+ p+=line("Músculo esquelético",last.skeletalKg," kg",1);
+ p+=line("Agua corporal",last.waterPct,"%",1);
+ p+=line("Proteína",last.proteinPct,"%",1);
+ p+=line("Grasa visceral",last.visceral,"",0);
+ p+=line("Grasa subcutánea",last.subcutaneous,"%",1);
+ p+=line("BMR",last.bmr," kcal",0);
+ p+=line("Edad corporal",last.bodyAge,"",0);
+ p+=line("Cintura",last.waist," cm",1);
+ p+=line("Cadera",last.hip," cm",1);
+ p+=line("Cuello",last.neck," cm",1);
+ p+=line("Brazo",last.armCirc," cm",1);
+ p+=line("Muslo",last.thighCirc," cm",1);
+ p+=line("Cintura/cadera",last.whrCirc,"",3);
+ p+=line("Cintura/altura",last.whtr,"",3);
+ p+=line("Puntuación Fitdays",last.score,"",0);
+ if(prev){
+  p+=`\nMEDICIÓN ANTERIOR (${prev.date}):\n`;
+  p+=line("Peso",prev.weight," kg",1);
+  p+=line("Grasa corporal (Fitdays)",prev.bodyFat,"%",1);
+  p+=line("Masa muscular",prev.muscleKg," kg",1);
+  p+=line("Cintura",prev.waist," cm",1);
+ }
+ if(first&&first!==last){
+  p+=`\nPRIMERA MEDICIÓN REGISTRADA (${first.date}):\n`;
+  p+=line("Peso",first.weight," kg",1);
+  p+=line("Grasa corporal (Fitdays)",first.bodyFat,"%",1);
+ }
+ p+=`\nCon estos datos, responde con encabezados cortos y viñetas:\n1) Resumen breve del estado actual.\n2) Qué está mejorando y qué empeorando frente a la medición anterior y desde el inicio del seguimiento.\n3) 3 a 5 sugerencias prácticas de nutrición y entrenamiento, generales y accionables.\n4) Qué vigilar en la próxima medición.\nSé conciso.`;
+ return p;
+}
+async function callGemini(prompt,apiKey,model){
+ const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+ const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+ const data=await res.json().catch(()=>null);
+ if(!res.ok) throw new Error(data?.error?.message||`HTTP ${res.status}`);
+ const text=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("")||"";
+ if(!text) throw new Error("Respuesta vacía del modelo.");
+ return text;
 }
 
 function calcNoCal(r){
@@ -574,6 +721,7 @@ function render(){
  const imp=rs.map(r=>{let x={...r};["z20","z100"].forEach(p=>{const a=["ra","la","rl","ll"].map(k=>r[p+"_"+k]).filter(Number.isFinite);x[p+"avg"]=a.length?a.reduce((s,v)=>s+v,0)/a.length:null});return x});
  const old=records;records=imp;draw($("chart2"),[{key:"z20avg",label:"Z extremidades 20 kHz"},{key:"z100avg",label:"Z extremidades 100 kHz"}]);records=old;
  draw($("chart3"),[{key:"waist",label:"Cintura"},{key:"hip",label:"Cadera"},{key:"neck",label:"Cuello"},{key:"armCirc",label:"Brazo"},{key:"thighCirc",label:"Muslo"}]);
+ $("localAnalysis").innerHTML=buildLocalAnalysis(rs);
  $("tbody").innerHTML="";
  [...rs].reverse().forEach(r=>{const idx=records.findIndex(x=>x.date===r.date&&x.time===r.time),tr=document.createElement("tr");
  [r.date,f(r.weight),f(r.fatKg),f(r.bodyFat),f(r.muscleKg),f(r.rfm),f(r.navyFat),f(r.combined),f(r.waist),f(r.hip),f(r.visceral),f(r.score,0)].forEach(x=>{let td=document.createElement("td");td.textContent=x;tr.appendChild(td)});
@@ -764,7 +912,33 @@ drop.addEventListener("drop",e=>{
   }).forEach(f=>dt.items.add(f));
   $("files").files=dt.files;
 });
-clear(true);applySettings();render()
+
+function loadGeminiSettings(){
+  try{
+    const k=localStorage.getItem(GEMINI_KEY_STORAGE);if(k)$("geminiKey").value=k;
+    const m=localStorage.getItem(GEMINI_MODEL_STORAGE);$("geminiModel").value=m||"gemini-2.5-flash";
+  }catch(e){}
+}
+$("geminiKey").addEventListener("change",()=>{try{localStorage.setItem(GEMINI_KEY_STORAGE,$("geminiKey").value)}catch(e){}});
+$("geminiModel").addEventListener("change",()=>{try{localStorage.setItem(GEMINI_MODEL_STORAGE,$("geminiModel").value)}catch(e){}});
+$("analyzeAI").onclick=async()=>{
+  const apiKey=$("geminiKey").value.trim();
+  const model=($("geminiModel").value||"gemini-2.5-flash").trim();
+  if(!apiKey){show("aiStatus","Introduce tu clave de API de Gemini.","err");return}
+  if(!records.length){show("aiStatus","Guarda al menos una medición primero.","err");return}
+  show("aiStatus","Consultando a Gemini…","warn");
+  $("aiResult").innerHTML="";
+  try{
+    const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date));
+    const text=await callGemini(buildGeminiPrompt(rs),apiKey,model);
+    $("aiResult").innerHTML=mdToHtml(text);
+    show("aiStatus","Análisis generado.","ok");
+  }catch(err){
+    show("aiStatus","No se pudo generar el análisis: "+err.message,"err");
+  }
+};
+
+clear(true);applySettings();loadGeminiSettings();render()
 })();
 </script>
 </body>
