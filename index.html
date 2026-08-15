@@ -33,6 +33,10 @@ canvas{width:100%;height:260px;border:1px solid var(--line);border-radius:12px;b
 .tabpane{display:none}.tabpane.on{display:block}
 .segment-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}@media(max-width:700px){.segment-grid{grid-template-columns:repeat(2,1fr)}}.segment{border:1px solid var(--line);border-radius:10px;padding:9px}.segment b{font-size:12px}.segment input{margin-top:6px}
 code{font-size:11px}.hidden{display:none!important}
+.chart-block{padding:6px;border-radius:12px;transition:box-shadow .2s,background .2s}
+.chart-block.spotlight{box-shadow:0 0 0 2px var(--a);background:var(--soft)}
+.ai-badge{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;background:var(--a);color:#fff;font-size:11px;font-weight:700;vertical-align:middle}
+.ai-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle}
 footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-size:11px}
 </style>
 </head>
@@ -173,9 +177,18 @@ footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-
 <div class="kpi"><span>Última cintura</span><b id="dWaist">—</b><span id="dWaistDelta"></span></div>
 <div class="kpi"><span>Última cadera</span><b id="dHip">—</b><span id="dHipDelta"></span></div>
 </div>
-<h3>Composición corporal</h3><canvas id="chart1" width="1100" height="285"></canvas>
-<h3>Impedancia: promedio de extremidades</h3><canvas id="chart2" width="1100" height="285"></canvas>
-<h3>Perímetros corporales</h3><canvas id="chart3" width="1100" height="285"></canvas>
+<div id="chartCard_composicion" class="chart-block">
+<h3>Composición corporal<span id="chartBadge_composicion" class="ai-badge hidden"></span></h3>
+<canvas id="chart1" width="1100" height="285"></canvas>
+</div>
+<div id="chartCard_impedancia" class="chart-block">
+<h3>Impedancia: promedio de extremidades<span id="chartBadge_impedancia" class="ai-badge hidden"></span></h3>
+<canvas id="chart2" width="1100" height="285"></canvas>
+</div>
+<div id="chartCard_perimetros" class="chart-block">
+<h3>Perímetros corporales<span id="chartBadge_perimetros" class="ai-badge hidden"></span></h3>
+<canvas id="chart3" width="1100" height="285"></canvas>
+</div>
 <div class="actions">
 <button id="backupJson">Respaldar todo (.json)</button>
 <label class="btn secondary">Restaurar respaldo<input id="restoreJson" type="file" accept=".json,application/json" hidden></label>
@@ -187,19 +200,26 @@ footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-
 </section>
 
 <section class="card s12">
-<h2>4) Análisis y sugerencias</h2>
-<h3>Lectura automática (fórmulas biométricas)</h3>
-<div id="localAnalysis" class="help">Guarda al menos una medición para ver el análisis.</div>
-
-<h3>Análisis con IA (Gemini, opcional)</h3>
-<p class="help">Envía los mismos datos (los que ya ves arriba: composición, perímetros, tendencia) a la <b>API de Gemini</b> de Google para obtener una interpretación en lenguaje natural y sugerencias personalizadas. Necesitas tu propia clave de API (gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>). La clave se guarda solo en este navegador (no se incluye en el respaldo .json) y la llamada va directa de tu navegador a Google.</p>
+<h2>4) Análisis, pronóstico y sugerencias</h2>
+<p class="help">Las fórmulas (IMC, RFM, % grasa por perímetros, tendencias, proyección lineal) las calcula siempre el código, al instante y sin conexión — eso no cambia. Con tu clave de <b>Gemini</b> (gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>), esos números pasan a la IA para que sea ella quien interprete el progreso completo del historial, decida qué gráfico destacar arriba, redacte el pronóstico y dé sugerencias. Se ejecuta sola cada vez que guardas una medición; el botón la relanza manualmente. La clave se guarda solo en este navegador (no viaja en el respaldo .json).</p>
 <div class="form" style="grid-template-columns:2fr 1fr">
   <div><label>Clave de API de Gemini</label><input id="geminiKey" type="password" placeholder="AIza…" autocomplete="off"></div>
   <div><label>Modelo</label><input id="geminiModel" type="text" placeholder="gemini-2.5-flash"></div>
 </div>
-<div class="actions"><button id="analyzeAI">Analizar con IA</button></div>
+<div class="actions"><button id="analyzeAI">Actualizar análisis con IA</button></div>
 <div id="aiStatus" class="status hidden"></div>
-<div id="aiResult"></div>
+
+<div id="aiPanel" style="margin-top:14px">
+<div id="aiResumen" class="help"></div>
+<div id="aiPronostico" class="note hidden" style="margin-top:10px"></div>
+<div id="aiDestacados" style="margin-top:10px"></div>
+<div id="aiAlertas" style="margin-top:10px"></div>
+<div id="aiSugerencias" style="margin-top:10px"></div>
+<div id="aiResult" style="margin-top:10px"></div>
+</div>
+
+<h3>Lectura automática (fórmulas biométricas)</h3>
+<div id="localAnalysis" class="help">Guarda al menos una medición para ver el análisis.</div>
 </section>
 
 <section class="card s12">
@@ -379,59 +399,88 @@ function mdToHtml(text){
  t=t.split(/\n{2,}/).map(p=>p.trim()).filter(Boolean).map(p=>/^<(h4|ul)/.test(p)?p:`<p class="help">${p.replace(/\n/g,"<br>")}</p>`).join("");
  return t;
 }
-function buildGeminiPrompt(rs){
- const last=rs.at(-1),prev=rs.length>1?rs.at(-2):null,first=rs[0];
+function linreg(pts){
+ const n=pts.length;if(n<2)return null;
+ const mx=pts.reduce((s,p)=>s+p.x,0)/n,my=pts.reduce((s,p)=>s+p.y,0)/n;
+ let num=0,den=0;
+ pts.forEach(p=>{num+=(p.x-mx)*(p.y-my);den+=(p.x-mx)*(p.x-mx)});
+ if(den===0)return null;
+ const slope=num/den;
+ return{slope,intercept:my-slope*mx};
+}
+function forecastSeries(rs,key,weeksAhead=4){
+ const base=rs[0]?.date;if(!base)return null;
+ const baseMs=new Date(base).getTime();
+ const pts=rs.filter(r=>Number.isFinite(r[key])).map(r=>({x:(new Date(r.date).getTime()-baseMs)/864e5,y:r[key]}));
+ if(pts.length<2)return null;
+ const reg=linreg(pts);if(!reg)return null;
+ const lastPt=pts.at(-1);
+ const futureX=lastPt.x+weeksAhead*7;
+ const projected=reg.slope*futureX+reg.intercept;
+ const projectedDate=new Date(baseMs+futureX*864e5).toISOString().slice(0,10);
+ return{slopePerWeek:reg.slope*7,current:lastPt.y,projected,projectedDate,weeksAhead};
+}
+function buildForecast(rs){
+ return{weight:forecastSeries(rs,"weight",4),fat:forecastSeries(rs,"fatKg",4)};
+}
+function buildGeminiPrompt(rs,forecast){
+ const last=rs.at(-1);
  const line=(label,val,unit="",dec)=>Number.isFinite(val)?`${label}: ${dec!=null?val.toFixed(dec):val}${unit}\n`:"";
- let p=`Eres un asistente que interpreta datos de composición corporal de una báscula de bioimpedancia (Fitdays, 8 electrodos, 20 y 100 kHz) junto con perímetros corporales medidos a mano. Responde en español, tono claro y cercano, sin jerga médica innecesaria. No des diagnósticos médicos; si algún valor amerita consulta médica (por ejemplo grasa visceral muy alta o IMC en rango de obesidad), dilo con cuidado y sugiere consultar a un profesional de la salud.\n\n`;
+ let p=`Eres el motor de análisis de una app de seguimiento de composición corporal (báscula Fitdays de 8 electrodos, 20/100 kHz, más perímetros medidos a mano). Todas las fórmulas (IMC, RFM, % grasa por perímetros, tendencias y la proyección lineal) ya están calculadas por la app con matemática exacta: NO las recalcules ni inventes cifras nuevas, úsalas tal cual como base de tu análisis. Responde en español, tono claro y cercano, sin jerga médica innecesaria. No des diagnósticos médicos; si algún valor amerita consulta profesional (por ejemplo grasa visceral muy alta o IMC en rango de obesidad), dilo con cuidado y sugiere consultar a un profesional de la salud.\n\n`;
  p+=`PERFIL:\nSexo: ${last.sex==="F"?"Mujer":"Hombre"}\n`;
  p+=line("Edad",last.age," años",0);
  p+=line("Altura",last.height," cm",1);
- p+=`\nÚLTIMA MEDICIÓN (${last.date}):\n`;
- p+=line("Peso",last.weight," kg",1);
- p+=line("IMC",last.bmi,"",1);
- p+=line("Grasa corporal (Fitdays)",last.bodyFat,"%",1);
- p+=line("Grasa corporal (RFM, cintura/altura)",last.rfm,"%",1);
- p+=line("Grasa corporal (perímetros, método Navy)",last.navyFat,"%",1);
- p+=line("Grasa corporal combinada",last.combined,"%",1);
- p+=line("Masa muscular",last.muscleKg," kg",1);
- p+=line("Músculo esquelético",last.skeletalKg," kg",1);
- p+=line("Agua corporal",last.waterPct,"%",1);
- p+=line("Proteína",last.proteinPct,"%",1);
- p+=line("Grasa visceral",last.visceral,"",0);
- p+=line("Grasa subcutánea",last.subcutaneous,"%",1);
- p+=line("BMR",last.bmr," kcal",0);
- p+=line("Edad corporal",last.bodyAge,"",0);
- p+=line("Cintura",last.waist," cm",1);
- p+=line("Cadera",last.hip," cm",1);
- p+=line("Cuello",last.neck," cm",1);
- p+=line("Brazo",last.armCirc," cm",1);
- p+=line("Muslo",last.thighCirc," cm",1);
- p+=line("Cintura/cadera",last.whrCirc,"",3);
- p+=line("Cintura/altura",last.whtr,"",3);
- p+=line("Puntuación Fitdays",last.score,"",0);
- if(prev){
-  p+=`\nMEDICIÓN ANTERIOR (${prev.date}):\n`;
-  p+=line("Peso",prev.weight," kg",1);
-  p+=line("Grasa corporal (Fitdays)",prev.bodyFat,"%",1);
-  p+=line("Masa muscular",prev.muscleKg," kg",1);
-  p+=line("Cintura",prev.waist," cm",1);
- }
- if(first&&first!==last){
-  p+=`\nPRIMERA MEDICIÓN REGISTRADA (${first.date}):\n`;
-  p+=line("Peso",first.weight," kg",1);
-  p+=line("Grasa corporal (Fitdays)",first.bodyFat,"%",1);
- }
- p+=`\nCon estos datos, responde con encabezados cortos y viñetas:\n1) Resumen breve del estado actual.\n2) Qué está mejorando y qué empeorando frente a la medición anterior y desde el inicio del seguimiento.\n3) 3 a 5 sugerencias prácticas de nutrición y entrenamiento, generales y accionables.\n4) Qué vigilar en la próxima medición.\nSé conciso.`;
+ p+=line("Peso objetivo Fitdays",last.targetWeight," kg",1);
+ p+=`\nHISTORIAL COMPLETO (${rs.length} mediciones, de más antigua a más reciente):\n`;
+ rs.forEach(r=>{
+  p+=`- ${r.date}: peso ${f(r.weight,1)} kg, grasa ${f(r.bodyFat,1)}% (combinada ${f(r.combined,1)}%), músculo ${f(r.muscleKg,1)} kg, cintura ${f(r.waist,1)} cm, cadera ${f(r.hip,1)} cm, visceral ${f(r.visceral,0)}\n`;
+ });
+ p+=`\nPROYECCIÓN LINEAL YA CALCULADA (regresión sobre el historial completo, no la recalcules):\n`;
+ if(forecast?.weight) p+=`Peso: ritmo ${forecast.weight.slopePerWeek>=0?"+":""}${forecast.weight.slopePerWeek.toFixed(2)} kg/semana → proyectado ${forecast.weight.projected.toFixed(1)} kg para el ${forecast.weight.projectedDate}.\n`;
+ if(forecast?.fat) p+=`Grasa corporal: ritmo ${forecast.fat.slopePerWeek>=0?"+":""}${forecast.fat.slopePerWeek.toFixed(2)} kg/semana → proyectada ${forecast.fat.projected.toFixed(1)} kg para el ${forecast.fat.projectedDate}.\n`;
+ if(!forecast?.weight&&!forecast?.fat) p+="No hay suficientes mediciones todavía para proyectar.\n";
+ p+=`\nLECTURA POR FÓRMULAS DE LA ÚLTIMA MEDICIÓN (${last.date}):\n`;
+ p+=`IMC ${f(last.bmi,1)} (${bmiCategory(last.bmi)||"sin datos"}). `;
+ p+=`Cintura/altura ${f(last.whtr,3)} (${whtrCategory(last.whtr)||"sin datos"}). `;
+ p+=`Cintura/cadera ${f(last.whrCirc,3)} (${whrCategory(last.whrCirc,last.sex)||"sin datos"}). `;
+ p+=`Grasa visceral ${f(last.visceral,0)} (${visceralCategory(last.visceral)||"sin datos"}).\n`;
+ p+=`\nCon esta información: 1) interpreta el progreso de todo el historial (no solo el último cambio), 2) elige qué gráfico de la app merece destacarse ahora entre "composicion" (peso/grasa/músculo), "impedancia" (bioimpedancia 20/100kHz) o "perimetros" (cintura/cadera/cuello/brazo/muslo) y por qué, 3) redacta un pronóstico breve que interprete la proyección lineal ya calculada (no la sustituyas por otra cifra), 4) da entre 3 y 6 sugerencias prácticas y accionables de nutrición/entrenamiento, 5) lista alertas solo si algo realmente lo amerita (si no hay ninguna, deja el array vacío).`;
  return p;
+}
+function geminiResponseSchema(){
+ return{
+  type:"OBJECT",
+  properties:{
+   resumen:{type:"STRING"},
+   destacados:{type:"ARRAY",items:{type:"OBJECT",properties:{
+     metrica:{type:"STRING"},direccion:{type:"STRING",enum:["mejora","empeora","estable"]},nota:{type:"STRING"}
+   },required:["metrica","direccion","nota"]}},
+   alertas:{type:"ARRAY",items:{type:"STRING"}},
+   sugerencias:{type:"ARRAY",items:{type:"STRING"}},
+   pronostico:{type:"STRING"},
+   grafico_recomendado:{type:"STRING",enum:["composicion","impedancia","perimetros"]},
+   grafico_motivo:{type:"STRING"}
+  },
+  required:["resumen","destacados","alertas","sugerencias","pronostico","grafico_recomendado","grafico_motivo"]
+ };
 }
 async function callGemini(prompt,apiKey,model){
  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
- const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+ const body={
+  contents:[{parts:[{text:prompt}]}],
+  generationConfig:{responseMimeType:"application/json",responseSchema:geminiResponseSchema()}
+ };
+ const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
  const data=await res.json().catch(()=>null);
  if(!res.ok) throw new Error(data?.error?.message||`HTTP ${res.status}`);
  const text=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("")||"";
  if(!text) throw new Error("Respuesta vacía del modelo.");
- return text;
+ const cleaned=text.trim().replace(/^```json\s*/i,"").replace(/^```\s*/,"").replace(/```\s*$/,"");
+ try{
+  return{json:JSON.parse(cleaned)};
+ }catch(e){
+  return{text};
+ }
 }
 
 function calcNoCal(r){
@@ -494,7 +543,8 @@ function update(){
 function save(){
  const r=formRecord();if(!r.date||!Number.isFinite(r.weight)){show("saveStatus","Fecha y peso son obligatorios.","err");return}
  if(editIndex!=null)records[editIndex]=r;else{const dup=records.findIndex(x=>x.date===r.date&&x.time===r.time);if(dup>=0)records[dup]=r;else records.push(r)}
- records.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem(KEY,JSON.stringify(records));saveSettings();show("saveStatus","Medición guardada.","ok");editIndex=null;render()
+ records.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem(KEY,JSON.stringify(records));saveSettings();show("saveStatus","Medición guardada.","ok");editIndex=null;render();
+ if($("geminiKey").value.trim()) runAIAnalysis();
 }
 function v(text,regexes){
  const t=norm(text);for(const re of regexes){const m=t.match(re);if(m){const x=parseFloat(m[1].replace(",","."));if(Number.isFinite(x))return x}}return null
@@ -702,22 +752,40 @@ $("analyze").onclick=async()=>{
  }
  if(fs.length>1){records.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem(KEY,JSON.stringify(records));render()}
 }
-function draw(canvas,series){
+function draw(canvas,series,opts){
  const ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height,p={l:55,r:25,t:25,b:40};ctx.clearRect(0,0,W,H);ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);
  const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date));if(!rs.length)return;
- let vals=[];series.forEach(s=>rs.forEach(r=>Number.isFinite(r[s.key])&&vals.push(r[s.key])));if(!vals.length)return;let mn=Math.min(...vals),mx=Math.max(...vals);if(mn===mx){mn-=1;mx+=1}let pd=(mx-mn)*.12;mn-=pd;mx+=pd;
- const X=i=>p.l+(W-p.l-p.r)*(rs.length===1?.5:i/(rs.length-1)),Y=v=>p.t+(H-p.t-p.b)*(1-(v-mn)/(mx-mn));
+ const fc=opts&&opts.forecast&&Number.isFinite(opts.forecast.value)?opts.forecast:null;
+ const totalPts=rs.length+(fc?1:0);
+ let vals=[];series.forEach(s=>rs.forEach(r=>Number.isFinite(r[s.key])&&vals.push(r[s.key])));if(fc)vals.push(fc.value);
+ if(!vals.length)return;let mn=Math.min(...vals),mx=Math.max(...vals);if(mn===mx){mn-=1;mx+=1}let pd=(mx-mn)*.12;mn-=pd;mx+=pd;
+ const X=i=>p.l+(W-p.l-p.r)*(totalPts===1?.5:i/(totalPts-1)),Y=v=>p.t+(H-p.t-p.b)*(1-(v-mn)/(mx-mn));
  ctx.strokeStyle="#e4eaed";for(let i=0;i<5;i++){let y=p.t+(H-p.t-p.b)*i/4;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke()}
  const C=["#27b9bd","#7f56d9","#f79009","#344054","#d92d20","#0ba5ec"];
- series.forEach((s,j)=>{ctx.strokeStyle=C[j%C.length];ctx.fillStyle=C[j%C.length];ctx.lineWidth=2.4;ctx.beginPath();let st=false;rs.forEach((r,i)=>{let v=r[s.key];if(!Number.isFinite(v))return;st?ctx.lineTo(X(i),Y(v)):(ctx.moveTo(X(i),Y(v)),st=true)});ctx.stroke();rs.forEach((r,i)=>{let v=r[s.key];if(Number.isFinite(v)){ctx.beginPath();ctx.arc(X(i),Y(v),3.5,0,Math.PI*2);ctx.fill()}});ctx.fillRect(p.l+j*160,H-18,12,3);ctx.fillStyle="#344054";ctx.fillText(s.label,p.l+17+j*160,H-14)});
- ctx.fillStyle="#687784";rs.forEach((r,i)=>{if(i===0||i===rs.length-1||rs.length<7)ctx.fillText(r.date.slice(5),X(i)-16,H-p.b+18)})
+ series.forEach((s,j)=>{
+  ctx.strokeStyle=C[j%C.length];ctx.fillStyle=C[j%C.length];ctx.lineWidth=2.4;ctx.beginPath();let st=false;
+  rs.forEach((r,i)=>{let v=r[s.key];if(!Number.isFinite(v))return;st?ctx.lineTo(X(i),Y(v)):(ctx.moveTo(X(i),Y(v)),st=true)});
+  ctx.stroke();
+  rs.forEach((r,i)=>{let v=r[s.key];if(Number.isFinite(v)){ctx.beginPath();ctx.arc(X(i),Y(v),3.5,0,Math.PI*2);ctx.fill()}});
+  if(fc&&s.key===fc.key){
+   const lastReal=rs.map((r,i)=>[i,r[s.key]]).filter(([,v])=>Number.isFinite(v)).pop();
+   if(lastReal){
+    ctx.setLineDash([6,5]);ctx.beginPath();ctx.moveTo(X(lastReal[0]),Y(lastReal[1]));ctx.lineTo(X(rs.length),Y(fc.value));ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(X(rs.length),Y(fc.value),4.5,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=C[j%C.length];ctx.stroke();
+   }
+  }
+  ctx.fillRect(p.l+j*160,H-18,12,3);ctx.fillStyle="#344054";ctx.fillText(s.label,p.l+17+j*160,H-14);
+ });
+ ctx.fillStyle="#687784";rs.forEach((r,i)=>{if(i===0||i===rs.length-1||rs.length<7)ctx.fillText(r.date.slice(5),X(i)-16,H-p.b+18)});
+ if(fc){ctx.fillStyle="#187c83";ctx.fillText("~"+fc.date.slice(5),X(rs.length)-16,H-p.b+18)}
 }
 function render(){
  const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date)),first=rs[0],last=rs.at(-1);
  const set=(id,key,u)=>$(id).textContent=last&&Number.isFinite(last[key])?f(last[key],1)+u:"—";set("dWeight","weight"," kg");set("dFat","bodyFat","%");set("dMuscle","muscleKg"," kg");set("dWaist","waist"," cm");set("dHip","hip"," cm");
  const delta=(id,key,u)=>$(id).textContent=first&&last&&Number.isFinite(first[key])&&Number.isFinite(last[key])?`${last[key]-first[key]>=0?"+":""}${(last[key]-first[key]).toFixed(1)} ${u} desde 31/05`:"";
  delta("dWeightDelta","weight","kg");delta("dFatDelta","bodyFat","pp");delta("dMuscleDelta","muscleKg","kg");delta("dWaistDelta","waist","cm");delta("dHipDelta","hip","cm");
- draw($("chart1"),[{key:"weight",label:"Peso kg"},{key:"fatKg",label:"Grasa kg"},{key:"muscleKg",label:"Músculo kg"}]);
+ const forecast=buildForecast(rs);
+ draw($("chart1"),[{key:"weight",label:"Peso kg"},{key:"fatKg",label:"Grasa kg"},{key:"muscleKg",label:"Músculo kg"}],forecast.weight?{forecast:{key:"weight",value:forecast.weight.projected,date:forecast.weight.projectedDate}}:null);
  const imp=rs.map(r=>{let x={...r};["z20","z100"].forEach(p=>{const a=["ra","la","rl","ll"].map(k=>r[p+"_"+k]).filter(Number.isFinite);x[p+"avg"]=a.length?a.reduce((s,v)=>s+v,0)/a.length:null});return x});
  const old=records;records=imp;draw($("chart2"),[{key:"z20avg",label:"Z extremidades 20 kHz"},{key:"z100avg",label:"Z extremidades 100 kHz"}]);records=old;
  draw($("chart3"),[{key:"waist",label:"Cintura"},{key:"hip",label:"Cadera"},{key:"neck",label:"Cuello"},{key:"armCirc",label:"Brazo"},{key:"thighCirc",label:"Muslo"}]);
@@ -921,22 +989,68 @@ function loadGeminiSettings(){
 }
 $("geminiKey").addEventListener("change",()=>{try{localStorage.setItem(GEMINI_KEY_STORAGE,$("geminiKey").value)}catch(e){}});
 $("geminiModel").addEventListener("change",()=>{try{localStorage.setItem(GEMINI_MODEL_STORAGE,$("geminiModel").value)}catch(e){}});
-$("analyzeAI").onclick=async()=>{
+
+function highlightChart(which,motivo){
+  ["composicion","impedancia","perimetros"].forEach(k=>{
+    const card=$("chartCard_"+k),badge=$("chartBadge_"+k);
+    if(!card||!badge)return;
+    if(k===which){
+      card.classList.add("spotlight");
+      badge.textContent="🤖 destacado"+(motivo?": "+motivo:"");
+      badge.classList.remove("hidden");
+    }else{
+      card.classList.remove("spotlight");
+      badge.classList.add("hidden");
+    }
+  });
+}
+function clearAIPanel(){
+  ["aiResumen","aiPronostico","aiDestacados","aiAlertas","aiSugerencias","aiResult"].forEach(id=>$(id).innerHTML="");
+  $("aiPronostico").classList.add("hidden");
+}
+function renderAIStructured(d,forecast){
+  $("aiResumen").innerHTML=d.resumen?`<p>${escapeHtml(d.resumen)}</p>`:"";
+
+  let pronHtml="";
+  if(forecast?.weight)pronHtml+=`Peso: ${f(forecast.weight.current,1)} kg → proyección a ${forecast.weight.weeksAhead} semanas (${forecast.weight.projectedDate}): <b>${f(forecast.weight.projected,1)} kg</b> (${forecast.weight.slopePerWeek>=0?"+":""}${forecast.weight.slopePerWeek.toFixed(2)} kg/semana).<br>`;
+  if(forecast?.fat)pronHtml+=`Grasa: ${f(forecast.fat.current,1)} kg → proyección: <b>${f(forecast.fat.projected,1)} kg</b> (${forecast.fat.slopePerWeek>=0?"+":""}${forecast.fat.slopePerWeek.toFixed(2)} kg/semana).<br>`;
+  if(d.pronostico)pronHtml+=`<span style="display:block;margin-top:6px">${escapeHtml(d.pronostico)}</span>`;
+  if(pronHtml){$("aiPronostico").innerHTML="<b>Pronóstico</b><br>"+pronHtml;$("aiPronostico").classList.remove("hidden")}
+  else $("aiPronostico").classList.add("hidden");
+
+  const dirColor={mejora:"var(--ok)",empeora:"var(--bad)",estable:"var(--muted)"};
+  $("aiDestacados").innerHTML=(d.destacados&&d.destacados.length)?"<b>Destacados</b><ul style=\"padding-left:0;list-style:none;margin:6px 0 0\">"+d.destacados.map(x=>`<li class="help" style="margin-bottom:5px"><span class="ai-dot" style="background:${dirColor[x.direccion]||"var(--muted)"}"></span><b>${escapeHtml(x.metrica)}</b>: ${escapeHtml(x.nota)}</li>`).join("")+"</ul>":"";
+
+  $("aiAlertas").innerHTML=(d.alertas&&d.alertas.length)?d.alertas.map(a=>`<div class="note" style="margin-top:8px">${escapeHtml(a)}</div>`).join(""):"";
+
+  $("aiSugerencias").innerHTML=(d.sugerencias&&d.sugerencias.length)?"<b>Sugerencias</b><ul style=\"padding-left:18px;margin:6px 0 0\">"+d.sugerencias.map(s=>`<li class="help" style="margin-bottom:4px">${escapeHtml(s)}</li>`).join("")+"</ul>":"";
+
+  highlightChart(d.grafico_recomendado,d.grafico_motivo);
+}
+let aiRunning=false;
+async function runAIAnalysis(){
+  if(aiRunning)return;
   const apiKey=$("geminiKey").value.trim();
   const model=($("geminiModel").value||"gemini-2.5-flash").trim();
   if(!apiKey){show("aiStatus","Introduce tu clave de API de Gemini.","err");return}
   if(!records.length){show("aiStatus","Guarda al menos una medición primero.","err");return}
+  aiRunning=true;
   show("aiStatus","Consultando a Gemini…","warn");
-  $("aiResult").innerHTML="";
   try{
     const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date));
-    const text=await callGemini(buildGeminiPrompt(rs),apiKey,model);
-    $("aiResult").innerHTML=mdToHtml(text);
+    const forecast=buildForecast(rs);
+    const result=await callGemini(buildGeminiPrompt(rs,forecast),apiKey,model);
+    clearAIPanel();
+    if(result.json)renderAIStructured(result.json,forecast);
+    else $("aiResult").innerHTML=mdToHtml(result.text);
     show("aiStatus","Análisis generado.","ok");
   }catch(err){
     show("aiStatus","No se pudo generar el análisis: "+err.message,"err");
+  }finally{
+    aiRunning=false;
   }
-};
+}
+$("analyzeAI").onclick=runAIAnalysis;
 
 clear(true);applySettings();loadGeminiSettings();render()
 })();
