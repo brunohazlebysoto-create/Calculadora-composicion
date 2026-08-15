@@ -37,6 +37,10 @@ code{font-size:11px}.hidden{display:none!important}
 .chart-block.spotlight{box-shadow:0 0 0 2px var(--a);background:var(--soft)}
 .ai-badge{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;background:var(--a);color:#fff;font-size:11px;font-weight:700;vertical-align:middle}
 .ai-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.ai-hero{border:1.5px solid var(--a);background:var(--soft)}
+.ai-hero h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ai-hero-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.ai-stamp{font-size:11px;color:var(--muted);margin-top:4px}
 footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-size:11px}
 </style>
 </head>
@@ -47,6 +51,19 @@ footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-
 </header>
 <main>
 <div class="grid">
+
+<section class="card s12 ai-hero">
+<div class="ai-hero-head">
+  <div>
+    <h2>🤖 Tu análisis con IA<span id="aiHeroBadge" class="ai-badge hidden"></span></h2>
+    <div id="aiHeroSummary" class="help">Configura tu clave de Gemini (gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>) para que la IA analice tu progreso completo, elija qué gráfico destacar y te dé pronóstico y sugerencias cada vez que guardes una medición.</div>
+    <div id="aiHeroStamp" class="ai-stamp"></div>
+  </div>
+  <button id="aiHeroCta" class="secondary">Configurar IA</button>
+</div>
+<div id="aiHeroDestacados" style="margin-top:10px"></div>
+<div id="aiHeroPronostico" class="note hidden" style="margin-top:10px"></div>
+</section>
 
 <section class="card s12">
 <h2>1) Importar informe Fitdays</h2>
@@ -199,7 +216,7 @@ footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-
 <p class="help"><b>Respaldo JSON:</b> guarda todos los registros y la configuración de la app en un único archivo. Es la opción recomendada para cambiar de teléfono/navegador o conservar una copia completa.</p>
 </section>
 
-<section class="card s12">
+<section class="card s12" id="aiSection">
 <h2>4) Análisis, pronóstico y sugerencias</h2>
 <p class="help">Las fórmulas (IMC, RFM, % grasa por perímetros, tendencias, proyección lineal) las calcula siempre el código, al instante y sin conexión — eso no cambia. Con tu clave de <b>Gemini</b> (gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>), esos números pasan a la IA para que sea ella quien interprete el progreso completo del historial, decida qué gráfico destacar arriba, redacte el pronóstico y dé sugerencias. Se ejecuta sola cada vez que guardas una medición; el botón la relanza manualmente. La clave se guarda solo en este navegador (no viaja en el respaldo .json).</p>
 <div class="form" style="grid-template-columns:2fr 1fr">
@@ -256,6 +273,7 @@ const $=x=>document.getElementById(x),
       OLD_SETTINGS_KEYS=["fitdays8e_v5_settings"],
       GEMINI_KEY_STORAGE="fitdays8e_v6_gemini_key",
       GEMINI_MODEL_STORAGE="fitdays8e_v6_gemini_model",
+      GEMINI_LAST_STORAGE="fitdays8e_v6_gemini_last",
       APP_VERSION="6.0";
 const SEG=["Brazo derecho","Brazo izquierdo","Tronco","Pierna derecha","Pierna izquierda"];
 const SEGKEY=["ra","la","trunk","rl","ll"];
@@ -1008,7 +1026,14 @@ function clearAIPanel(){
   ["aiResumen","aiPronostico","aiDestacados","aiAlertas","aiSugerencias","aiResult"].forEach(id=>$(id).innerHTML="");
   $("aiPronostico").classList.add("hidden");
 }
-function renderAIStructured(d,forecast){
+function formatStamp(ts){
+  return"Último análisis: "+new Date(ts).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+const CHART_LABEL={composicion:"Composición corporal",impedancia:"Impedancia",perimetros:"Perímetros corporales"};
+function renderAIStructured(d,forecast,ts){
+  ts=ts||Date.now();
+  const dirColor={mejora:"var(--ok)",empeora:"var(--bad)",estable:"var(--muted)"};
+
   $("aiResumen").innerHTML=d.resumen?`<p>${escapeHtml(d.resumen)}</p>`:"";
 
   let pronHtml="";
@@ -1018,7 +1043,6 @@ function renderAIStructured(d,forecast){
   if(pronHtml){$("aiPronostico").innerHTML="<b>Pronóstico</b><br>"+pronHtml;$("aiPronostico").classList.remove("hidden")}
   else $("aiPronostico").classList.add("hidden");
 
-  const dirColor={mejora:"var(--ok)",empeora:"var(--bad)",estable:"var(--muted)"};
   $("aiDestacados").innerHTML=(d.destacados&&d.destacados.length)?"<b>Destacados</b><ul style=\"padding-left:0;list-style:none;margin:6px 0 0\">"+d.destacados.map(x=>`<li class="help" style="margin-bottom:5px"><span class="ai-dot" style="background:${dirColor[x.direccion]||"var(--muted)"}"></span><b>${escapeHtml(x.metrica)}</b>: ${escapeHtml(x.nota)}</li>`).join("")+"</ul>":"";
 
   $("aiAlertas").innerHTML=(d.alertas&&d.alertas.length)?d.alertas.map(a=>`<div class="note" style="margin-top:8px">${escapeHtml(a)}</div>`).join(""):"";
@@ -1026,6 +1050,29 @@ function renderAIStructured(d,forecast){
   $("aiSugerencias").innerHTML=(d.sugerencias&&d.sugerencias.length)?"<b>Sugerencias</b><ul style=\"padding-left:18px;margin:6px 0 0\">"+d.sugerencias.map(s=>`<li class="help" style="margin-bottom:4px">${escapeHtml(s)}</li>`).join("")+"</ul>":"";
 
   highlightChart(d.grafico_recomendado,d.grafico_motivo);
+
+  // Tarjeta destacada al inicio de la página: resumen condensado del mismo análisis.
+  $("aiHeroSummary").textContent=d.resumen||"Análisis generado.";
+  $("aiHeroBadge").textContent=CHART_LABEL[d.grafico_recomendado]?"📈 "+CHART_LABEL[d.grafico_recomendado]:"";
+  $("aiHeroBadge").classList.toggle("hidden",!CHART_LABEL[d.grafico_recomendado]);
+  $("aiHeroDestacados").innerHTML=(d.destacados&&d.destacados.length)?d.destacados.slice(0,4).map(x=>`<span style="display:inline-flex;align-items:center;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 11px 4px 8px;margin:0 6px 6px 0;font-size:12px"><span class="ai-dot" style="background:${dirColor[x.direccion]||"var(--muted)"}"></span>${escapeHtml(x.metrica)}</span>`).join(""):"";
+  if(d.pronostico){$("aiHeroPronostico").innerHTML=`<b>Pronóstico:</b> ${escapeHtml(d.pronostico)}`;$("aiHeroPronostico").classList.remove("hidden")}
+  else $("aiHeroPronostico").classList.add("hidden");
+  $("aiHeroStamp").textContent=formatStamp(ts);
+}
+function hydrateFromLastResult(){
+  try{
+    const raw=localStorage.getItem(GEMINI_LAST_STORAGE);
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(saved.json){
+      renderAIStructured(saved.json,saved.forecast,saved.ts);
+    }else if(saved.text){
+      $("aiResult").innerHTML=mdToHtml(saved.text);
+      $("aiHeroSummary").textContent="Análisis generado (ver detalle en la sección 4).";
+      $("aiHeroStamp").textContent=formatStamp(saved.ts);
+    }
+  }catch(e){}
 }
 let aiRunning=false;
 async function runAIAnalysis(){
@@ -1035,24 +1082,36 @@ async function runAIAnalysis(){
   if(!apiKey){show("aiStatus","Introduce tu clave de API de Gemini.","err");return}
   if(!records.length){show("aiStatus","Guarda al menos una medición primero.","err");return}
   aiRunning=true;
+  const prevStamp=$("aiHeroStamp").textContent;
   show("aiStatus","Consultando a Gemini…","warn");
+  $("aiHeroStamp").textContent="Analizando…";
   try{
     const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date));
     const forecast=buildForecast(rs);
     const result=await callGemini(buildGeminiPrompt(rs,forecast),apiKey,model);
     clearAIPanel();
-    if(result.json)renderAIStructured(result.json,forecast);
-    else $("aiResult").innerHTML=mdToHtml(result.text);
+    const ts=Date.now();
+    if(result.json){
+      renderAIStructured(result.json,forecast,ts);
+      try{localStorage.setItem(GEMINI_LAST_STORAGE,JSON.stringify({json:result.json,forecast,ts}))}catch(e){}
+    }else{
+      $("aiResult").innerHTML=mdToHtml(result.text);
+      $("aiHeroSummary").textContent="Análisis generado (ver detalle en la sección 4).";
+      $("aiHeroStamp").textContent=formatStamp(ts);
+      try{localStorage.setItem(GEMINI_LAST_STORAGE,JSON.stringify({text:result.text,ts}))}catch(e){}
+    }
     show("aiStatus","Análisis generado.","ok");
   }catch(err){
+    $("aiHeroStamp").textContent=prevStamp;
     show("aiStatus","No se pudo generar el análisis: "+err.message,"err");
   }finally{
     aiRunning=false;
   }
 }
 $("analyzeAI").onclick=runAIAnalysis;
+$("aiHeroCta").onclick=()=>{$("aiSection").scrollIntoView({behavior:"smooth"});$("geminiKey").focus()};
 
-clear(true);applySettings();loadGeminiSettings();render()
+clear(true);applySettings();loadGeminiSettings();render();hydrateFromLastResult()
 })();
 </script>
 </body>
