@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fitdays PDF/PNG + Circunferencias v6</title>
+<style>
+:root{--bg:#f4f7f8;--card:#fff;--ink:#173042;--muted:#687784;--line:#dbe4e8;--a:#27b9bd;--a2:#187c83;--ok:#16845b;--warn:#b26a00;--bad:#b42318;--soft:#edfafa}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:22px max(18px,calc((100vw - 1240px)/2))}
+header h1{margin:0;font-size:clamp(24px,3vw,36px)}header p{margin:7px 0 0;color:var(--muted);max-width:980px}
+main{max-width:1240px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 3px 12px rgba(28,54,67,.035)}
+.s12{grid-column:span 12}.s8{grid-column:span 8}.s6{grid-column:span 6}.s4{grid-column:span 4}
+@media(max-width:900px){.s8,.s6,.s4{grid-column:span 12}}
+h2{font-size:19px;margin:0 0 11px}h3{font-size:15px;margin:18px 0 8px}
+.muted,.help{color:var(--muted)}.help{font-size:12px;line-height:1.45}
+.drop{border:2px dashed #9fb2ba;border-radius:14px;padding:20px;text-align:center;background:#fbfdfd}.drop.drag{border-color:var(--a);background:var(--soft)}
+button,.btn{border:0;border-radius:9px;padding:10px 14px;background:var(--a2);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+button.secondary,.btn.secondary{background:#f5f7f8;color:#344a55;border:1px solid #cbd7dc}.danger{background:#fff!important;color:var(--bad)!important;border:1px solid #f1b5af!important}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}@media(max-width:700px){.form{grid-template-columns:repeat(2,1fr)}}@media(max-width:450px){.form{grid-template-columns:1fr}}
+label{display:block;font-size:11px;font-weight:750;color:#49606b;margin-bottom:4px}
+input,select,textarea{width:100%;border:1px solid #cad7dc;border-radius:8px;padding:9px 10px;background:#fff;font:inherit}
+input[type=checkbox]{width:auto}.checks{display:flex;gap:13px;flex-wrap:wrap}.checks label{font-size:12px;font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{border:1px solid var(--line);border-radius:12px;padding:12px}.kpi span{font-size:11px;color:var(--muted)}.kpi b{display:block;font-size:21px;margin-top:3px}
+.status{margin-top:10px;padding:10px 12px;border-radius:9px;background:#f1f5f7;white-space:pre-wrap;font-size:13px}.status.ok{background:#eaf8f2;color:#096b49}.status.warn{background:#fff7e8;color:#8a5200}.status.err{background:#fff0ef;color:#9f241a}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}.scroll{overflow:auto}
+canvas{width:100%;height:260px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.note{border-left:4px solid #e09a1d;background:#fffaf0;padding:9px 11px;border-radius:7px;font-size:12px;line-height:1.45}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tab{padding:7px 10px;border-radius:999px;background:#eef3f5;color:#45616d;cursor:pointer;font-size:12px;font-weight:700}.tab.on{background:var(--a);color:#fff}
+.tabpane{display:none}.tabpane.on{display:block}
+.segment-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}@media(max-width:700px){.segment-grid{grid-template-columns:repeat(2,1fr)}}.segment{border:1px solid var(--line);border-radius:10px;padding:9px}.segment b{font-size:12px}.segment input{margin-top:6px}
+code{font-size:11px}.hidden{display:none!important}
+footer{max-width:1240px;margin:auto;padding:0 20px 28px;color:var(--muted);font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Fitdays 8 electrodos + circunferencias <small style="font-size:.45em;color:#687784">v6</small></h1>
+  <p>Extractor especializado para tu informe Fitdays: composición corporal, grasa/músculo segmentario, indicadores y <b>bioimpedancia de 20 y 100 kHz</b>. La v6 combina los datos de la báscula Fitdays con tus <b>perímetros corporales</b> (cuello, cintura, cadera, brazo, muslo): además de guardarlos como tendencia, ahora cuello+cintura(+cadera) alimentan una tercera estimación de grasa corporal (método de perímetros/Navy) que se mezcla con Fitdays y RFM. Incluye respaldo/restauración completa en JSON.</p>
+</header>
+<main>
+<div class="grid">
+
+<section class="card s12">
+<h2>1) Importar informe Fitdays</h2>
+<div id="drop" class="drop">
+  <input id="files" type="file" accept=".pdf,.png,application/pdf,image/png" multiple>
+  <p><b>PDF de Fitdays o imagen PNG del informe</b></p>
+  <p class="help">PDF con texto → extracción directa. PDF escaneado → OCR. PNG → OCR directo. Después aplica validación cruzada kg↔%↔peso para detectar errores típicos de OCR (por ejemplo confundir 3,5 kg de una pierna con 23,1 kg de grasa total). Los perímetros corporales (cintura, cadera, cuello, brazo, muslo) no vienen en el informe Fitdays: se completan a mano en la pestaña "Circunferencias".</p>
+  <div class="actions" style="justify-content:center">
+    <button id="analyze">Analizar archivo</button>
+    <button id="manual" class="secondary">Nueva medición manual</button>
+  </div>
+</div>
+<div id="status" class="status hidden"></div>
+</section>
+
+<section class="card s8">
+<h2>2) Revisar / completar medición</h2>
+<div class="tabs">
+  <span class="tab on" data-tab="general">General</span>
+  <span class="tab" data-tab="circ">Circunferencias</span>
+  <span class="tab" data-tab="segment">Segmentario</span>
+  <span class="tab" data-tab="imp">Impedancia</span>
+</div>
+
+<div id="general" class="tabpane on">
+<div class="form">
+  <div><label>Fecha</label><input id="date" type="date"></div>
+  <div><label>Hora</label><input id="time" type="time" step="1"></div>
+  <div><label>ID / nombre</label><input id="person" type="text"></div>
+  <div><label>Sexo</label><select id="sex"><option value="M">Hombre</option><option value="F">Mujer</option></select></div>
+  <div><label>Edad</label><input id="age" type="number" step="1"></div>
+  <div><label>Altura (cm)</label><input id="height" type="number" step=".1"></div>
+  <div><label>Puntuación Fitdays</label><input id="score" type="number" step="1"></div>
+  <div><label>Peso (kg)</label><input id="weight" type="number" step=".1"></div>
+
+  <div><label>Grasa corporal (kg)</label><input id="fatKg" type="number" step=".1"></div>
+  <div><label>Grasa corporal (%)</label><input id="bodyFat" type="number" step=".1"></div>
+  <div><label>Masa muscular (kg)</label><input id="muscleKg" type="number" step=".1"></div>
+  <div><label>Masa muscular (%)</label><input id="musclePct" type="number" step=".1"></div>
+
+  <div><label>Músculo esquelético (kg)</label><input id="skeletalKg" type="number" step=".1"></div>
+  <div><label>Músculo esquelético (%)</label><input id="skeletalPct" type="number" step=".1"></div>
+  <div><label>Agua (kg)</label><input id="waterKg" type="number" step=".1"></div>
+  <div><label>Agua (%)</label><input id="waterPct" type="number" step=".1"></div>
+
+  <div><label>Proteína (kg)</label><input id="proteinKg" type="number" step=".1"></div>
+  <div><label>Proteína (%)</label><input id="proteinPct" type="number" step=".1"></div>
+  <div><label>Masa esquelética/ósea (kg)</label><input id="boneKg" type="number" step=".1"></div>
+  <div><label>IMC</label><input id="bmiFitdays" type="number" step=".1"></div>
+
+  <div><label>Grasa visceral</label><input id="visceral" type="number" step=".1"></div>
+  <div><label>Grasa subcutánea (%)</label><input id="subcutaneous" type="number" step=".1"></div>
+  <div><label>Peso sin grasa (kg)</label><input id="ffm" type="number" step=".1"></div>
+  <div><label>BMR (kcal)</label><input id="bmr" type="number" step="1"></div>
+
+  <div><label>SMI / ASMI (kg/m²)</label><input id="smi" type="number" step=".1"></div>
+  <div><label>Edad corporal</label><input id="bodyAge" type="number" step="1"></div>
+  <div><label>WHR (Fitdays)</label><input id="whr" type="number" step=".01"></div>
+  <div><label>Peso objetivo Fitdays (kg)</label><input id="targetWeight" type="number" step=".1"></div>
+</div>
+<h3>Condiciones de medición</h3>
+<div class="checks">
+<label><input id="morning" type="checkbox"> mañana</label>
+<label><input id="fasted" type="checkbox"> ayuno</label>
+<label><input id="bathroom" type="checkbox"> después de ir al baño</label>
+<label><input id="noExercise" type="checkbox"> sin ejercicio reciente</label>
+</div>
+</div>
+
+<div id="circ" class="tabpane">
+<div class="form">
+  <div><label>Cintura (cm)</label><input id="waist" type="number" step=".1"></div>
+  <div><label>Cadera (cm)</label><input id="hip" type="number" step=".1"></div>
+  <div><label>Cuello (cm)</label><input id="neck" type="number" step=".1"></div>
+  <div><label>Brazo relajado (cm)</label><input id="armCirc" type="number" step=".1"></div>
+  <div><label>Muslo (cm)</label><input id="thighCirc" type="number" step=".1"></div>
+</div>
+<div class="note" style="margin-top:12px">Para comparar semanas, usa siempre el mismo punto anatómico y una tensión de cinta similar. La cintura entra en el RFM; cuello + cintura (y cadera si eres mujer) alimentan además el método de perímetros (Navy) del panel derecho. Cadera también da la relación cintura/cadera medida. Brazo y muslo se conservan como tendencias independientes en la gráfica de perímetros.</div>
+</div>
+
+<div id="segment" class="tabpane">
+<h3>Grasa segmentaria (kg)</h3>
+<div class="segment-grid" id="fatSegments"></div>
+<h3>Músculo segmentario (kg)</h3>
+<div class="segment-grid" id="muscleSegments"></div>
+</div>
+
+<div id="imp" class="tabpane">
+<p class="help">Valores Z(Ω) del informe. Guardarlos es útil porque son datos eléctricos más cercanos a lo realmente medido por el equipo que los porcentajes derivados.</p>
+<h3>20 kHz</h3><div class="segment-grid" id="imp20"></div>
+<h3>100 kHz</h3><div class="segment-grid" id="imp100"></div>
+</div>
+
+<div class="actions">
+<button id="save">Guardar / actualizar</button>
+<button id="clear" class="secondary">Limpiar</button>
+</div>
+<div id="saveStatus" class="status hidden"></div>
+</section>
+
+<aside class="card s4">
+<h2>Estimaciones y control</h2>
+<div class="kpis" style="grid-template-columns:1fr 1fr">
+  <div class="kpi"><span>IMC calculado</span><b id="kbmi">—</b></div>
+  <div class="kpi"><span>Cintura/altura</span><b id="kwhratio">—</b></div>
+  <div class="kpi"><span>RFM (cintura)</span><b id="krfm">—</b></div>
+  <div class="kpi"><span>Grasa (perímetros)</span><b id="knavy">—</b></div>
+  <div class="kpi"><span>Cintura/cadera</span><b id="kwhrm">—</b></div>
+  <div class="kpi"><span>Combinada</span><b id="kcombined">—</b></div>
+  <div class="kpi"><span>Calidad BIA</span><b id="kquality">—</b></div>
+  <div class="kpi"><span>20→100 kHz</span><b id="kfreq">—</b></div>
+</div>
+<div class="note" style="margin-top:12px"><b>Combinada ≠ método clínico.</b> Mezcla Fitdays (BIA), RFM (cintura/altura) y el método de perímetros (Navy: cuello/cintura/cadera) cuando hay datos suficientes de cada uno. Antes de DXA funciona como señal de tendencia. Con DXA, corrige el sesgo individual observado de cada método en tu cuerpo.</div>
+<h3>DXA opcional</h3>
+<div class="form" style="grid-template-columns:1fr 1fr">
+<div><label>Grasa DXA (%)</label><input id="dxaFat" type="number" step=".1"></div>
+<div><label>Grasa DXA (kg)</label><input id="dxaFatKg" type="number" step=".1"></div>
+</div>
+<p id="calibrationInfo" class="help"></p>
+</aside>
+
+<section class="card s12">
+<h2>3) Seguimiento</h2>
+<div class="kpis">
+<div class="kpi"><span>Último peso</span><b id="dWeight">—</b><span id="dWeightDelta"></span></div>
+<div class="kpi"><span>Última grasa Fitdays</span><b id="dFat">—</b><span id="dFatDelta"></span></div>
+<div class="kpi"><span>Último músculo</span><b id="dMuscle">—</b><span id="dMuscleDelta"></span></div>
+<div class="kpi"><span>Última cintura</span><b id="dWaist">—</b><span id="dWaistDelta"></span></div>
+<div class="kpi"><span>Última cadera</span><b id="dHip">—</b><span id="dHipDelta"></span></div>
+</div>
+<h3>Composición corporal</h3><canvas id="chart1" width="1100" height="285"></canvas>
+<h3>Impedancia: promedio de extremidades</h3><canvas id="chart2" width="1100" height="285"></canvas>
+<h3>Perímetros corporales</h3><canvas id="chart3" width="1100" height="285"></canvas>
+<div class="actions">
+<button id="backupJson">Respaldar todo (.json)</button>
+<label class="btn secondary">Restaurar respaldo<input id="restoreJson" type="file" accept=".json,application/json" hidden></label>
+<button id="export">Exportar CSV</button>
+<label class="btn secondary">Importar CSV<input id="csv" type="file" accept=".csv" hidden></label>
+<button id="erase" class="danger">Borrar historial</button>
+</div>
+<p class="help"><b>Respaldo JSON:</b> guarda todos los registros y la configuración de la app en un único archivo. Es la opción recomendada para cambiar de teléfono/navegador o conservar una copia completa.</p>
+</section>
+
+<section class="card s12">
+<h2>Historial</h2>
+<div class="scroll"><table><thead><tr>
+<th>Fecha</th><th>Peso</th><th>Grasa kg</th><th>Grasa %</th><th>Músculo kg</th><th>RFM %</th><th>Perímetros %</th><th>Combinada %</th><th>Cintura</th><th>Cadera</th><th>Visceral</th><th>Score</th><th></th>
+</tr></thead><tbody id="tbody"></tbody></table></div>
+</section>
+
+<section class="card s12">
+<details>
+<summary><b>Qué extrae y cómo interpretar la aplicación</b></summary>
+<p class="help">Se guarda el valor bruto de impedancia de 5 segmentos a 20 y 100 kHz. Esto permite vigilar si una medición anómala del % de grasa coincide con un cambio eléctrico grande, algo compatible con cambios de hidratación/contacto.</p>
+<p class="help">RFM = 64 − 20 × (altura/cintura) + 12 si es mujer. Usa altura y cintura en la misma unidad.</p>
+<p class="help"><b>Método de perímetros (Navy):</b> estimación clásica de grasa corporal a partir de cuello, cintura y altura (y cadera en mujeres), independiente de la bioimpedancia. Hombres: %grasa = 495 / (1.0324 − 0.19077·log10(cintura−cuello) + 0.15456·log10(altura)) − 450. Mujeres: %grasa = 495 / (1.29579 − 0.35004·log10(cintura+cadera−cuello) + 0.22100·log10(altura)) − 450. Todas las medidas en cm. Aparece en el panel derecho como "Grasa (perímetros)" en cuanto hay cuello y cintura (y cadera si corresponde).</p>
+<p class="help">La estimación combinada mezcla Fitdays, RFM y perímetros con pesos 50/25/25% (se reparten proporcionalmente si falta algún dato). Si existe un DXA anterior, primero resta a cada método el sesgo individual observado frente a DXA y luego combina.</p>
+<p class="help">El indicador 20→100 kHz muestra el cociente medio Z100/Z20 de las cuatro extremidades. No es un diagnóstico ni estima por sí solo agua intra/extracelular; se conserva para comparar la estabilidad de tus propias mediciones.</p>
+<p class="help">Los datos se guardan en <code>localStorage</code> del navegador. Para no perderlos, usa <b>Respaldar todo (.json)</b>. El CSV queda como formato adicional para análisis en Excel/Sheets.</p>
+</details>
+</section>
+
+</div>
+</main>
+<footer>Seguimiento personal; no sustituye DXA, antropometría ISAK ni evaluación clínica.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+(()=>{
+const $=x=>document.getElementById(x),
+      KEY="fitdays8e_v6_records",
+      OLD_KEYS=["fitdays8e_v5_records","fitdays8e_v4_records","fitdays8e_v2_records"],
+      SETTINGS_KEY="fitdays8e_v6_settings",
+      OLD_SETTINGS_KEYS=["fitdays8e_v5_settings"],
+      APP_VERSION="6.0";
+const SEG=["Brazo derecho","Brazo izquierdo","Tronco","Pierna derecha","Pierna izquierda"];
+const SEGKEY=["ra","la","trunk","rl","ll"];
+const general=["date","time","person","sex","age","height","score","weight","fatKg","bodyFat","muscleKg","musclePct","skeletalKg","skeletalPct","waterKg","waterPct","proteinKg","proteinPct","boneKg","bmiFitdays","visceral","subcutaneous","ffm","bmr","smi","bodyAge","whr","targetWeight","waist","hip","neck","armCirc","thighCirc","dxaFat","dxaFatKg"];
+const checks=["morning","fasted","bathroom","noExercise"];
+let editIndex=null;
+
+function segmentInputs(container,prefix){
+  $(container).innerHTML=SEG.map((s,i)=>`<div class="segment"><b>${s}</b><input id="${prefix}_${SEGKEY[i]}" type="number" step=".1"></div>`).join("");
+}
+segmentInputs("fatSegments","sf"); segmentInputs("muscleSegments","sm"); segmentInputs("imp20","z20"); segmentInputs("imp100","z100");
+
+const preloaded=[
+{date:"2026-05-31",time:"10:59:34",person:"Bruno",sex:"M",age:34,height:180,score:74,weight:94.9,fatKg:25.6,bodyFat:27.0,muscleKg:64.7,skeletalKg:39.8,waterKg:50.8,proteinKg:13.9,boneKg:4.6,bmiFitdays:29.3,visceral:10,subcutaneous:19.3,ffm:69.3,bmr:1866,smi:9.6,bodyAge:36,whr:.92,targetWeight:80.0,
+sf_ra:1.6,sf_la:1.6,sf_trunk:14.2,sf_rl:3.8,sf_ll:3.8,sm_ra:4.0,sm_la:4.0,sm_trunk:30.3,sm_rl:11.5,sm_ll:11.5,
+z20_ra:268.7,z20_la:270.1,z20_trunk:17.6,z20_rl:288.3,z20_ll:290.2,z100_ra:233.1,z100_la:233.7,z100_trunk:11.3,z100_rl:249.8,z100_ll:252.3},
+{date:"2026-06-23",time:"08:56:42",person:"Bruno",sex:"M",age:34,height:180,score:75,weight:93.7,fatKg:24.3,bodyFat:25.9,muscleKg:64.8,musclePct:69.2,skeletalKg:39.8,skeletalPct:42.5,waterKg:50.9,waterPct:54.3,proteinKg:13.9,proteinPct:14.8,boneKg:4.6,bmiFitdays:28.9,visceral:9,subcutaneous:18.5,ffm:69.4,bmr:1869,smi:9.5,bodyAge:35,whr:.92,targetWeight:80.2,
+sf_ra:1.5,sf_la:1.5,sf_trunk:13.7,sf_rl:3.6,sf_ll:3.6,sm_ra:4.0,sm_la:4.0,sm_trunk:30.3,sm_rl:11.4,sm_ll:11.4,
+z20_ra:288.1,z20_la:291.2,z20_trunk:13.6,z20_rl:302.3,z20_ll:311.3,z100_ra:247.5,z100_la:250.4,z100_trunk:7.4,z100_rl:258.8,z100_ll:267.2},
+{date:"2026-07-14",time:"08:38:49",person:"Bruno",sex:"M",age:34,height:180,score:75,weight:94.8,fatKg:25.0,bodyFat:26.4,muscleKg:65.0,musclePct:68.6,skeletalKg:40.0,skeletalPct:42.2,waterKg:51.1,waterPct:53.9,proteinKg:13.9,proteinPct:14.7,boneKg:4.7,bmiFitdays:29.3,visceral:10,subcutaneous:18.9,ffm:69.7,bmr:1875,smi:9.6,bodyAge:35,whr:.90,targetWeight:80.5,
+sf_ra:1.6,sf_la:1.5,sf_trunk:14.1,sf_rl:3.7,sf_ll:3.7,sm_ra:4.0,sm_la:4.1,sm_trunk:30.4,sm_rl:11.5,sm_ll:11.5,
+z20_ra:277.4,z20_la:274.0,z20_trunk:15.5,z20_rl:301.3,z20_ll:305.6,z100_ra:238.3,z100_la:232.9,z100_trunk:8.6,z100_rl:258.9,z100_ll:263.6},
+{date:"2026-08-04",time:"10:45:47",person:"Bruno",sex:"M",age:34,height:180,score:76,weight:92.1,fatKg:23.1,bodyFat:25.1,muscleKg:64.4,musclePct:69.9,skeletalKg:39.5,skeletalPct:42.9,waterKg:50.6,waterPct:54.9,proteinKg:13.8,proteinPct:15.0,boneKg:4.6,bmiFitdays:28.4,visceral:9,subcutaneous:17.9,ffm:69.0,bmr:1860,smi:9.5,bodyAge:35,whr:.90,targetWeight:79.7,
+sf_ra:1.4,sf_la:1.4,sf_trunk:12.8,sf_rl:3.5,sf_ll:3.5,sm_ra:4.0,sm_la:4.0,sm_trunk:30.1,sm_rl:11.4,sm_ll:11.4,
+z20_ra:273.3,z20_la:272.3,z20_trunk:17.6,z20_rl:291.5,z20_ll:292.9,z100_ra:235.9,z100_la:233.8,z100_trunk:11.0,z100_rl:251.9,z100_ll:253.8}
+];
+function loadRecordsWithMigration(){
+  const current=localStorage.getItem(KEY);
+  if(current){
+    try{return JSON.parse(current)||[]}catch(e){}
+  }
+  for(const oldKey of OLD_KEYS){
+    const raw=localStorage.getItem(oldKey);
+    if(raw){
+      try{
+        const migrated=JSON.parse(raw)||[];
+        localStorage.setItem(KEY,JSON.stringify(migrated));
+        return migrated;
+      }catch(e){}
+    }
+  }
+  localStorage.setItem(KEY,JSON.stringify(preloaded));
+  return JSON.parse(JSON.stringify(preloaded));
+}
+let records=loadRecordsWithMigration();
+
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const n=id=>{const v=parseFloat($(id)?.value);return Number.isFinite(v)?v:null},f=(x,d=1)=>Number.isFinite(x)?x.toFixed(d):"—";
+const norm=s=>(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\u00a0/g," ").replace(/\s+/g," ");
+function show(id,msg,type=""){let e=$(id);e.className="status "+type;e.textContent=msg;e.classList.remove("hidden")}
+
+function navyBodyFat(r){
+ const height=r.height,waist=r.waist,neck=r.neck,hip=r.hip;
+ if(!Number.isFinite(height)||!Number.isFinite(waist)||!Number.isFinite(neck)) return null;
+ let val=null;
+ if(r.sex==="F"){
+   if(!Number.isFinite(hip)) return null;
+   const inner=waist+hip-neck;
+   if(inner<=0) return null;
+   val=495/(1.29579-0.35004*Math.log10(inner)+0.22100*Math.log10(height))-450;
+ }else{
+   const inner=waist-neck;
+   if(inner<=0) return null;
+   val=495/(1.0324-0.19077*Math.log10(inner)+0.15456*Math.log10(height))-450;
+ }
+ if(!Number.isFinite(val)) return null;
+ return Math.max(2,Math.min(65,val));
+}
+
+function calcNoCal(r){
+ const hm=r.height/100;r.bmi=(r.weight&&hm)?r.weight/(hm*hm):null;r.whtr=(r.waist&&r.height)?r.waist/r.height:null;r.rfm=(r.waist&&r.height)?64-20*(r.height/r.waist)+(r.sex==="F"?12:0):null;r.navyFat=navyBodyFat(r);r.whrCirc=(r.waist&&r.hip)?r.waist/r.hip:null;return r
+}
+function lastCalibration(before){
+ const a=records.map(x=>calcNoCal({...x})).filter(x=>Number.isFinite(x.dxaFat)&&(!before||x.date<=before)).sort((a,b)=>a.date.localeCompare(b.date));
+ if(!a.length)return null;const x=a[a.length-1];
+ return{
+   date:x.date,
+   fitBias:Number.isFinite(x.bodyFat)?x.bodyFat-x.dxaFat:0,
+   rfmBias:Number.isFinite(x.rfm)?x.rfm-x.dxaFat:0,
+   navyBias:Number.isFinite(x.navyFat)?x.navyFat-x.dxaFat:0
+ }
+}
+function calc(r){
+ const hm=r.height/100;
+ r.bmi=(r.weight&&hm)?r.weight/(hm*hm):null;
+ r.whtr=(r.waist&&r.height)?r.waist/r.height:null;
+ r.rfm=(r.waist&&r.height)?64-20*(r.height/r.waist)+(r.sex==="F"?12:0):null;
+ if(Number.isFinite(r.rfm))r.rfm=Math.max(2,Math.min(65,r.rfm));
+ r.navyFat=navyBodyFat(r);
+ r.whrCirc=(r.waist&&r.hip)?r.waist/r.hip:null;
+ r.quality=25*checks.reduce((a,k)=>a+(r[k]?1:0),0);
+ const exts=["ra","la","rl","ll"];
+ const ratios=exts.map(k=>Number.isFinite(r["z20_"+k])&&Number.isFinite(r["z100_"+k])?r["z100_"+k]/r["z20_"+k]:null).filter(Number.isFinite);
+ r.freqRatio=ratios.length?ratios.reduce((a,b)=>a+b,0)/ratios.length:null;
+ const cal=lastCalibration(r.date);
+ const fa=Number.isFinite(r.bodyFat)?r.bodyFat-(cal?.fitBias||0):null;
+ const ra=Number.isFinite(r.rfm)?r.rfm-(cal?.rfmBias||0):null;
+ const na=Number.isFinite(r.navyFat)?r.navyFat-(cal?.navyBias||0):null;
+ const legs=[];
+ if(Number.isFinite(fa))legs.push([fa,.5]);
+ if(Number.isFinite(ra))legs.push([ra,.25]);
+ if(Number.isFinite(na))legs.push([na,.25]);
+ if(legs.length){
+   const w=legs.reduce((s,[,w])=>s+w,0);
+   r.combined=legs.reduce((s,[v,w])=>s+v*w,0)/w;
+ }else r.combined=null;
+ return r;
+}
+function formRecord(){
+ let r={}; general.forEach(k=>r[k]=["date","time","person","sex"].includes(k)?$(k).value:n(k));
+ checks.forEach(k=>r[k]=$(k).checked);
+ ["sf","sm","z20","z100"].forEach(p=>SEGKEY.forEach(k=>r[p+"_"+k]=n(p+"_"+k)));
+ return calc(r)
+}
+function fill(r){
+ clear(false);general.forEach(k=>{if($(k)&&r[k]!=null)$(k).value=r[k]});
+ checks.forEach(k=>$(k).checked=!!r[k]);["sf","sm","z20","z100"].forEach(p=>SEGKEY.forEach(k=>{if(r[p+"_"+k]!=null)$(p+"_"+k).value=r[p+"_"+k]}));update()
+}
+function clear(profile=true){
+ editIndex=null;general.forEach(k=>{$(k).value=""});checks.forEach(k=>$(k).checked=false);["sf","sm","z20","z100"].forEach(p=>SEGKEY.forEach(k=>$(p+"_"+k).value=""));
+ if(profile){$("person").value="Bruno";$("sex").value="M";$("age").value=34;$("height").value=180;$("date").value=new Date().toISOString().slice(0,10)} update()
+}
+function update(){
+ const r=formRecord();$("kbmi").textContent=f(r.bmi,1);$("kwhratio").textContent=f(r.whtr,3);$("krfm").textContent=Number.isFinite(r.rfm)?f(r.rfm,1)+"%":"—";$("knavy").textContent=Number.isFinite(r.navyFat)?f(r.navyFat,1)+"%":"—";$("kwhrm").textContent=f(r.whrCirc,3);$("kcombined").textContent=Number.isFinite(r.combined)?f(r.combined,1)+"%":"—";$("kquality").textContent=(r.quality||0)+"%";$("kfreq").textContent=Number.isFinite(r.freqRatio)?f(r.freqRatio,3):"—";
+ const c=lastCalibration(r.date);$("calibrationInfo").textContent=c?`Calibración activa: ${c.date}. Sesgo Fitdays ${c.fitBias>=0?"+":""}${c.fitBias.toFixed(1)} pp; RFM ${c.rfmBias>=0?"+":""}${c.rfmBias.toFixed(1)} pp; perímetros ${c.navyBias>=0?"+":""}${c.navyBias.toFixed(1)} pp.`:"Sin DXA: no hay calibración personal todavía."
+}
+function save(){
+ const r=formRecord();if(!r.date||!Number.isFinite(r.weight)){show("saveStatus","Fecha y peso son obligatorios.","err");return}
+ if(editIndex!=null)records[editIndex]=r;else{const dup=records.findIndex(x=>x.date===r.date&&x.time===r.time);if(dup>=0)records[dup]=r;else records.push(r)}
+ records.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem(KEY,JSON.stringify(records));saveSettings();show("saveStatus","Medición guardada.","ok");editIndex=null;render()
+}
+function v(text,regexes){
+ const t=norm(text);for(const re of regexes){const m=t.match(re);if(m){const x=parseFloat(m[1].replace(",","."));if(Number.isFinite(x))return x}}return null
+}
+function dateOf(text){let m=norm(text).match(/hora de la prueba\s*[: ]\s*(\d{1,2})\/(\d{1,2})\/(20\d{2})\s+(\d{1,2}:\d{2}(?::\d{2})?)/);return m?{date:`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`,time:m[4]}:{}}
+function parseCore(text){
+ const t=norm(text),dt=dateOf(text),r={...dt};
+ let m=t.match(/\bid\s*:\s*([a-z0-9 _-]+)/);if(m)r.person=m[1].trim().split(" genero")[0];
+ m=t.match(/genero\s*:\s*(hombre|mujer)/);if(m)r.sex=m[1]==="mujer"?"F":"M";
+ r.age=v(t,[/edad\s*:\s*(\d{1,3})/]);r.height=v(t,[/alto\s*:\s*(\d{3}(?:[.,]\d+)?)\s*cm/]);
+ r.score=v(t,[/puntuacion corporal[^0-9]{0,30}(\d{2,3})\s*\/\s*100/,/puntuacion y sugerencia[^0-9]{0,40}(\d{2,3})\s*puntos/]);
+ r.weight=v(t,[/\bpeso\b[^0-9]{0,30}(\d{2,3}(?:[.,]\d+)?)\s*(?:\(|kg)/,/analisis general[\s\S]{0,150}\bpeso\b[^0-9]{0,50}(\d{2,3}(?:[.,]\d+)?)\s*kg/]);
+ r.fatKg=v(t,[/grasa corporal[^0-9]{0,20}(\d{1,3}(?:[.,]\d+)?)\s*(?:\(|kg)/,/masa grasa[^0-9]{0,80}(\d{1,3}(?:[.,]\d+)?)\s*kg/]);
+ r.bodyFat=v(t,[/tasa de grasa corporal[^0-9%]{0,30}(\d{1,2}(?:[.,]\d+)?)\s*%/,/grasa corporal[\s\S]{0,100}?(\d{1,2}(?:[.,]\d+)?)\s*%/]);
+ r.boneKg=v(t,[/masa esqueletica[^0-9]{0,20}(\d{1,2}(?:[.,]\d+)?)\s*(?:\(|kg)/]);
+ r.proteinKg=v(t,[/cantidad de proteina[^0-9]{0,20}(\d{1,3}(?:[.,]\d+)?)\s*(?:\(|kg)/]);r.proteinPct=v(t,[/cantidad de proteina[\s\S]{0,80}?(\d{1,2}(?:[.,]\d+)?)\s*%/]);
+ r.waterKg=v(t,[/contenido de agua[^0-9]{0,20}(\d{1,3}(?:[.,]\d+)?)\s*(?:\(|kg)/]);r.waterPct=v(t,[/contenido de agua[\s\S]{0,80}?(\d{1,2}(?:[.,]\d+)?)\s*%/]);
+ r.muscleKg=v(t,[/masa muscular[^0-9]{0,20}(\d{1,3}(?:[.,]\d+)?)\s*(?:\(|kg)/]);r.musclePct=v(t,[/masa muscular[\s\S]{0,80}?(\d{1,2}(?:[.,]\d+)?)\s*%/]);
+ r.skeletalKg=v(t,[/musculo esqueletico[^0-9]{0,20}(\d{1,3}(?:[.,]\d+)?)\s*(?:\(|kg)/]);r.skeletalPct=v(t,[/musculo esqueletico[\s\S]{0,80}?(\d{1,2}(?:[.,]\d+)?)\s*%/]);
+ r.bmiFitdays=v(t,[/\bimc\b[^0-9]{0,40}(\d{1,2}(?:[.,]\d+)?)/]);r.visceral=v(t,[/grado de grasa visceral[^0-9]{0,20}(\d{1,2}(?:[.,]\d+)?)/]);
+ r.bmr=v(t,[/tasa metabolica basal[^0-9]{0,20}(\d{3,4})/]);r.ffm=v(t,[/peso corporal sin grasa[^0-9]{0,20}(\d{2,3}(?:[.,]\d+)?)\s*kg/]);
+ r.subcutaneous=v(t,[/grasa subcutanea[^0-9]{0,20}(\d{1,2}(?:[.,]\d+)?)\s*%/]);r.smi=v(t,[/\b(?:asmi|smi)\b[^0-9]{0,20}(\d{1,2}(?:[.,]\d+)?)\s*kg/]);
+ r.bodyAge=v(t,[/edad corporal[^0-9]{0,20}(\d{1,3})/]);r.whr=v(t,[/\bwhr\b[^0-9]{0,20}(\d(?:[.,]\d{1,2})?)/]);
+ r.targetWeight=v(t,[/peso objetivo recomendado[^0-9]{0,20}(\d{2,3}(?:[.,]\d+)?)\s*kg/]);
+ return r
+}
+
+function onlyDetected(obj){
+ const out={};
+ for(const [k,v] of Object.entries(obj)){
+   if(v!==null && v!==undefined && v!=="" && !(typeof v==="number" && !Number.isFinite(v))) out[k]=v;
+ }
+ return out;
+}
+
+function existingSameMeasurement(r){
+ if(!r.date) return null;
+ // For the reports already supplied, the values were visually verified and are
+ // a safer fallback than a previously saved OCR attempt.
+ const verified=preloaded.find(x=>x.date===r.date && (!r.time || !x.time || x.time===r.time));
+ if(verified) return {...verified};
+ const exact=records.find(x=>x.date===r.date && (!r.time || !x.time || x.time===r.time));
+ return exact ? {...exact} : null;
+}
+
+function reconcileFitdays(r){
+ const notes=[];
+ // Preserve known profile if OCR misses it.
+ if(!r.person) r.person="Bruno";
+ if(!r.sex) r.sex="M";
+ if(!Number.isFinite(r.age)) r.age=34;
+ if(!Number.isFinite(r.height)) r.height=180;
+
+ // Basic plausibility filters to stop segmental numbers entering whole-body fields.
+ const limits={
+   weight:[35,250], fatKg:[2,100], bodyFat:[3,65], muscleKg:[15,120],
+   skeletalKg:[10,70], waterKg:[15,100], proteinKg:[4,30], boneKg:[1,8],
+   bmiFitdays:[12,60], visceral:[1,40], subcutaneous:[3,50], ffm:[25,160],
+   bmr:[800,4000], smi:[3,20], bodyAge:[10,100], whr:[.5,1.5], score:[0,150]
+ };
+ for(const [k,[lo,hi]] of Object.entries(limits)){
+   if(Number.isFinite(r[k]) && (r[k]<lo || r[k]>hi)){
+     notes.push(`${k}: valor OCR descartado (${r[k]})`);
+     r[k]=null;
+   }
+ }
+
+ // Whole-body kg/% pairs are redundant in this report: use them to cross-check OCR.
+ const pair=(kgKey,pctKey,label,tolKg=1.0)=>{
+   const w=r.weight,kg=r[kgKey],pct=r[pctKey];
+   if(!Number.isFinite(w)) return;
+   if(Number.isFinite(pct)){
+     const expected=w*pct/100;
+     if(!Number.isFinite(kg)){
+       r[kgKey]=Math.round(expected*10)/10;
+       notes.push(`${label}: kg calculados desde %`);
+     }else if(Math.abs(kg-expected)>tolKg){
+       // Typical OCR failure: e.g. 3.5 kg leg fat instead of 23.1 kg total.
+       notes.push(`${label}: ${kg} kg no concuerda con ${pct}% → corregido a ${expected.toFixed(1)} kg`);
+       r[kgKey]=Math.round(expected*10)/10;
+     }
+   }else if(Number.isFinite(kg)){
+     r[pctKey]=Math.round((kg/w*100)*10)/10;
+     notes.push(`${label}: % calculado desde kg`);
+   }
+ };
+ pair("fatKg","bodyFat","Grasa corporal",1.0);
+ pair("muscleKg","musclePct","Masa muscular",1.2);
+ pair("skeletalKg","skeletalPct","Músculo esquelético",1.0);
+ pair("waterKg","waterPct","Agua corporal",1.0);
+ pair("proteinKg","proteinPct","Proteína",0.8);
+
+ // Fitdays "Masa Esquelética" behaves as a kg/% pair too.
+ if(Number.isFinite(r.weight) && Number.isFinite(r.boneKg) && !Number.isFinite(r.bonePct)){
+   r.bonePct=Math.round((r.boneKg/r.weight*100)*10)/10;
+ }
+
+ // Derive internally constrained values when OCR misses them.
+ if(Number.isFinite(r.weight) && Number.isFinite(r.height)){
+   const bmi=r.weight/Math.pow(r.height/100,2);
+   if(!Number.isFinite(r.bmiFitdays) || Math.abs(r.bmiFitdays-bmi)>1){
+     r.bmiFitdays=Math.round(bmi*10)/10;
+     notes.push(`IMC reconstruido: ${r.bmiFitdays}`);
+   }
+ }
+ if(Number.isFinite(r.weight) && Number.isFinite(r.fatKg)){
+   const ffm=r.weight-r.fatKg;
+   if(!Number.isFinite(r.ffm) || Math.abs(r.ffm-ffm)>1.5){
+     r.ffm=Math.round(ffm*10)/10;
+     notes.push(`Peso sin grasa reconstruido: ${r.ffm} kg`);
+   }
+ }
+ if(Number.isFinite(r.weight) && Number.isFinite(r.bodyFat) && Number.isFinite(r.subcutaneous)){
+   // no derivation; both are independent outputs
+ }
+
+ // Known 8E report: score is 0–100 in normal use; values above 100 are possible per Fitdays
+ // but OCR often mistakes nearby text. Keep only plausible score.
+ if(Number.isFinite(r.score) && r.score>120){
+   notes.push(`Puntuación OCR descartada (${r.score})`);
+   r.score=null;
+ }
+
+ return {record:r,notes};
+}
+
+// Parse the top-left composition table line-by-line when OCR preserves rows.
+// First number after each label = kg; last number on the row = proportion %.
+function parseCompositionRows(text){
+ const raw=(text||"").replace(/\r/g,"\n");
+ const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+ const out={};
+ const defs=[
+   ["weight",null,["peso"]],
+   ["fatKg","bodyFat",["grasa corporal"]],
+   ["boneKg","bonePct",["masa esqueletica","masa esquelética"]],
+   ["proteinKg","proteinPct",["cantidad de proteina","cantidad de proteína"]],
+   ["waterKg","waterPct",["contenido de agua"]],
+   ["muscleKg","musclePct",["masa muscular"]],
+   ["skeletalKg","skeletalPct",["musculo esqueletico","músculo esquelético"]]
+ ];
+ const normLine=s=>norm(s);
+ for(const [kg,pct,names] of defs){
+   let line=lines.find(l=>names.some(name=>normLine(l).includes(norm(name))));
+   if(!line) continue;
+   const nums=[...line.matchAll(/-?\d+(?:[.,]\d+)?/g)].map(m=>parseFloat(m[0].replace(",",".")));
+   if(!nums.length) continue;
+   // Remove obvious reference range endpoints only by using first and last.
+   out[kg]=nums[0];
+   if(pct && nums.length>=2) out[pct]=nums[nums.length-1];
+ }
+ return out;
+}
+
+async function fileText(file){
+ const lower=file.name.toLowerCase();
+ const isPdf=file.type==="application/pdf"||lower.endsWith(".pdf");
+ const isPng=file.type==="image/png"||lower.endsWith(".png");
+ if(!isPdf&&!isPng) throw new Error("Formato no compatible. Usa PDF o PNG.");
+ if(isPdf){
+   const data=new Uint8Array(await file.arrayBuffer()),pdf=await pdfjsLib.getDocument({data}).promise;let text="";
+   for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i),c=await page.getTextContent();text+=" "+c.items.map(x=>x.str).join(" ")}
+   if(norm(text).length>120)return text;
+   let all="";for(let i=1;i<=pdf.numPages;i++){show("status",`OCR del PDF: página ${i}/${pdf.numPages}…`,"warn");const page=await pdf.getPage(i),vp=page.getViewport({scale:1.7}),cv=document.createElement("canvas");cv.width=vp.width;cv.height=vp.height;await page.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;all+=" "+(await Tesseract.recognize(cv,"spa+eng")).data.text}return all
+ }else{
+   show("status","Aplicando OCR al PNG…","warn");
+   return (await Tesseract.recognize(file,"spa+eng")).data.text
+ }
+}
+$("analyze").onclick=async()=>{
+ const fs=[...$("files").files];if(!fs.length){show("status","Selecciona un archivo.","err");return}
+ for(const file of fs){
+   try{show("status",`Analizando ${file.name}…`,"warn");const text=await fileText(file),r=parseCore(text);
+      if(fs.length===1){
+        const detected=onlyDetected(r);
+        const known=existingSameMeasurement(detected);
+        const current=formRecord();
+        // Important: null OCR values no longer erase known height/profile values.
+        let merged={...current,...(known||{}),...detected};
+
+        // Try a second row-oriented parse. It is especially useful for exported PNG/PDF tables.
+        const rowData=onlyDetected(parseCompositionRows(text));
+        merged={...merged,...rowData};
+
+        const fixed=reconcileFitdays(merged);
+        fill(fixed.record);
+        const found=Object.keys(detected);
+        const msg=[
+          `Listo. Detectados: ${found.join(", ")||"ninguno"}.`,
+          known ? "La fecha/hora coincide con una medición ya guardada: usé esos datos como respaldo para evitar errores de OCR." : "",
+          fixed.notes.length ? "Validaciones automáticas:\n• "+fixed.notes.join("\n• ") : "",
+          "Revisa especialmente datos segmentarios e impedancia si el archivo fue leído por OCR. Los perímetros (cintura, cadera, cuello, brazo, muslo) no vienen en el PDF/PNG de Fitdays: complétalos a mano en la pestaña Circunferencias."
+        ].filter(Boolean).join("\n\n");
+        show("status",msg,"ok")
+      }
+      else{
+        const detected=onlyDetected(r);
+        const known=existingSameMeasurement(detected);
+        let base={person:"Bruno",sex:"M",age:34,height:180,...(known||{}),...detected,...onlyDetected(parseCompositionRows(text))};
+        base=reconcileFitdays(base).record;
+        const dup=records.findIndex(x=>x.date===base.date && x.time===base.time);
+        if(dup>=0) records[dup]=calc(base); else records.push(calc(base))
+      }
+   }catch(e){show("status","Error: "+e.message,"err")}
+ }
+ if(fs.length>1){records.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem(KEY,JSON.stringify(records));render()}
+}
+function draw(canvas,series){
+ const ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height,p={l:55,r:25,t:25,b:40};ctx.clearRect(0,0,W,H);ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);
+ const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date));if(!rs.length)return;
+ let vals=[];series.forEach(s=>rs.forEach(r=>Number.isFinite(r[s.key])&&vals.push(r[s.key])));if(!vals.length)return;let mn=Math.min(...vals),mx=Math.max(...vals);if(mn===mx){mn-=1;mx+=1}let pd=(mx-mn)*.12;mn-=pd;mx+=pd;
+ const X=i=>p.l+(W-p.l-p.r)*(rs.length===1?.5:i/(rs.length-1)),Y=v=>p.t+(H-p.t-p.b)*(1-(v-mn)/(mx-mn));
+ ctx.strokeStyle="#e4eaed";for(let i=0;i<5;i++){let y=p.t+(H-p.t-p.b)*i/4;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke()}
+ const C=["#27b9bd","#7f56d9","#f79009","#344054","#d92d20","#0ba5ec"];
+ series.forEach((s,j)=>{ctx.strokeStyle=C[j%C.length];ctx.fillStyle=C[j%C.length];ctx.lineWidth=2.4;ctx.beginPath();let st=false;rs.forEach((r,i)=>{let v=r[s.key];if(!Number.isFinite(v))return;st?ctx.lineTo(X(i),Y(v)):(ctx.moveTo(X(i),Y(v)),st=true)});ctx.stroke();rs.forEach((r,i)=>{let v=r[s.key];if(Number.isFinite(v)){ctx.beginPath();ctx.arc(X(i),Y(v),3.5,0,Math.PI*2);ctx.fill()}});ctx.fillRect(p.l+j*160,H-18,12,3);ctx.fillStyle="#344054";ctx.fillText(s.label,p.l+17+j*160,H-14)});
+ ctx.fillStyle="#687784";rs.forEach((r,i)=>{if(i===0||i===rs.length-1||rs.length<7)ctx.fillText(r.date.slice(5),X(i)-16,H-p.b+18)})
+}
+function render(){
+ const rs=records.map(x=>calc({...x})).sort((a,b)=>a.date.localeCompare(b.date)),first=rs[0],last=rs.at(-1);
+ const set=(id,key,u)=>$(id).textContent=last&&Number.isFinite(last[key])?f(last[key],1)+u:"—";set("dWeight","weight"," kg");set("dFat","bodyFat","%");set("dMuscle","muscleKg"," kg");set("dWaist","waist"," cm");set("dHip","hip"," cm");
+ const delta=(id,key,u)=>$(id).textContent=first&&last&&Number.isFinite(first[key])&&Number.isFinite(last[key])?`${last[key]-first[key]>=0?"+":""}${(last[key]-first[key]).toFixed(1)} ${u} desde 31/05`:"";
+ delta("dWeightDelta","weight","kg");delta("dFatDelta","bodyFat","pp");delta("dMuscleDelta","muscleKg","kg");delta("dWaistDelta","waist","cm");delta("dHipDelta","hip","cm");
+ draw($("chart1"),[{key:"weight",label:"Peso kg"},{key:"fatKg",label:"Grasa kg"},{key:"muscleKg",label:"Músculo kg"}]);
+ const imp=rs.map(r=>{let x={...r};["z20","z100"].forEach(p=>{const a=["ra","la","rl","ll"].map(k=>r[p+"_"+k]).filter(Number.isFinite);x[p+"avg"]=a.length?a.reduce((s,v)=>s+v,0)/a.length:null});return x});
+ const old=records;records=imp;draw($("chart2"),[{key:"z20avg",label:"Z extremidades 20 kHz"},{key:"z100avg",label:"Z extremidades 100 kHz"}]);records=old;
+ draw($("chart3"),[{key:"waist",label:"Cintura"},{key:"hip",label:"Cadera"},{key:"neck",label:"Cuello"},{key:"armCirc",label:"Brazo"},{key:"thighCirc",label:"Muslo"}]);
+ $("tbody").innerHTML="";
+ [...rs].reverse().forEach(r=>{const idx=records.findIndex(x=>x.date===r.date&&x.time===r.time),tr=document.createElement("tr");
+ [r.date,f(r.weight),f(r.fatKg),f(r.bodyFat),f(r.muscleKg),f(r.rfm),f(r.navyFat),f(r.combined),f(r.waist),f(r.hip),f(r.visceral),f(r.score,0)].forEach(x=>{let td=document.createElement("td");td.textContent=x;tr.appendChild(td)});
+ let td=document.createElement("td");td.innerHTML=`<button class="secondary" style="padding:5px 7px">Editar</button> <button class="danger" style="padding:5px 7px">X</button>`;td.children[0].onclick=()=>{editIndex=idx;fill(records[idx]);scrollTo({top:0,behavior:"smooth"})};td.children[1].onclick=()=>{records.splice(idx,1);localStorage.setItem(KEY,JSON.stringify(records));render()};tr.appendChild(td);$("tbody").appendChild(tr)
+ });
+ update()
+}
+
+function safeClone(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
+function currentSettings(){
+  return {
+    person: $("person")?.value || "Bruno",
+    sex: $("sex")?.value || "M",
+    age: n("age"),
+    height: n("height")
+  };
+}
+function saveSettings(){
+  try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(currentSettings()))}catch(e){}
+}
+function loadSettings(){
+  try{
+    const raw=localStorage.getItem(SETTINGS_KEY);
+    if(raw)return JSON.parse(raw)||{};
+    for(const oldKey of OLD_SETTINGS_KEYS){
+      const old=localStorage.getItem(oldKey);
+      if(old)return JSON.parse(old)||{};
+    }
+    return {};
+  }catch(e){return {}}
+}
+function applySettings(){
+  const s=loadSettings();
+  if(s.person && !$("person").value) $("person").value=s.person;
+  if(s.sex) $("sex").value=s.sex;
+  if(Number.isFinite(s.age)) $("age").value=s.age;
+  if(Number.isFinite(s.height)) $("height").value=s.height;
+}
+function makeFullBackup(){
+  const payload={
+    app:"Fitdays 8E + Circunferencias",
+    version:APP_VERSION,
+    exportedAt:new Date().toISOString(),
+    records:safeClone(records),
+    settings:currentSettings(),
+    meta:{
+      recordCount:records.length,
+      storageKey:KEY,
+      format:"fitdays8e-backup-json-v2"
+    }
+  };
+  return payload;
+}
+function downloadText(filename,text,type){
+  const blob=new Blob([text],{type:type||"text/plain;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),500);
+}
+$("backupJson").onclick=()=>{
+  saveSettings();
+  const payload=makeFullBackup();
+  const stamp=new Date().toISOString().slice(0,10);
+  downloadText(`Fitdays_respaldo_completo_${stamp}.json`,JSON.stringify(payload,null,2),"application/json;charset=utf-8");
+};
+
+$("restoreJson").onchange=async e=>{
+  const file=e.target.files?.[0];
+  if(!file)return;
+  try{
+    const raw=await file.text();
+    const data=JSON.parse(raw);
+
+    const validFormats=["fitdays8e-backup-json-v1","fitdays8e-backup-json-v2"];
+    if(!data || !validFormats.includes(data.meta?.format) || !Array.isArray(data.records)){
+      throw new Error("El archivo no parece ser un respaldo válido de esta app.");
+    }
+
+    const mode=confirm(
+      `Respaldo: ${data.records.length} registros.\n\n`+
+      `Aceptar = REEMPLAZAR el historial actual.\n`+
+      `Cancelar = MEZCLAR con el historial actual sin duplicar fecha+hora.`
+    ) ? "replace" : "merge";
+
+    if(mode==="replace"){
+      records=safeClone(data.records);
+    }else{
+      const map=new Map();
+      [...records,...data.records].forEach(r=>{
+        const key=`${r.date||""}|${r.time||""}`;
+        map.set(key,{...(map.get(key)||{}),...r});
+      });
+      records=[...map.values()];
+    }
+
+    records.sort((a,b)=>(a.date||"").localeCompare(b.date||"") || (a.time||"").localeCompare(b.time||""));
+    localStorage.setItem(KEY,JSON.stringify(records));
+
+    if(data.settings){
+      localStorage.setItem(SETTINGS_KEY,JSON.stringify(data.settings));
+    }
+
+    applySettings();
+    render();
+    show("status",`Respaldo restaurado correctamente: ${records.length} registros cargados.`,"ok");
+  }catch(err){
+    show("status","No se pudo restaurar el respaldo: "+err.message,"err");
+  }finally{
+    e.target.value="";
+  }
+};
+
+$("export").onclick=()=>{
+ const keys=[...new Set(records.flatMap(Object.keys))],lines=[keys.join(",")].concat(records.map(r=>keys.map(k=>{let s=r[k]==null?"":String(r[k]);return /[",\n]/.test(s)?`"${s.replaceAll('"','""')}"`:s}).join(",")));
+ const blob=new Blob(["﻿"+lines.join("\n")],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="Fitdays_Bruno_historial.csv";a.click();URL.revokeObjectURL(a.href)
+}
+
+function parseCSVRows(text){
+  const rows=[];let row=[],cell="",quoted=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i],next=text[i+1];
+    if(quoted && c==='"' && next==='"'){cell+='"';i++}
+    else if(c==='"'){quoted=!quoted}
+    else if(!quoted && c===','){row.push(cell);cell=""}
+    else if(!quoted && (c==='\n'||c==='\r')){
+      if(c==='\r'&&next==='\n')i++;
+      row.push(cell);cell="";
+      if(row.some(v=>v!==""))rows.push(row);
+      row=[];
+    }else cell+=c;
+  }
+  row.push(cell);
+  if(row.some(v=>v!==""))rows.push(row);
+  return rows;
+}
+$("csv").onchange=async e=>{
+  const file=e.target.files?.[0];
+  if(!file)return;
+  try{
+    const rows=parseCSVRows(await file.text());
+    if(rows.length<2)throw new Error("CSV vacío o inválido.");
+    const headers=rows[0].map(x=>x.trim());
+    const boolKeys=new Set(["morning","fasted","bathroom","noExercise"]);
+    const strKeys=new Set(["date","time","person","sex"]);
+    const incoming=rows.slice(1).map(vals=>{
+      const r={};
+      headers.forEach((k,i)=>{
+        const raw=(vals[i]??"").trim();
+        if(boolKeys.has(k))r[k]=raw==="true"||raw==="1";
+        else if(strKeys.has(k))r[k]=raw;
+        else r[k]=raw===""?null:Number(raw);
+      });
+      return r;
+    }).filter(r=>r.date || Number.isFinite(r.weight));
+
+    const map=new Map();
+    [...records,...incoming].forEach(r=>{
+      const key=`${r.date||""}|${r.time||""}`;
+      map.set(key,{...(map.get(key)||{}),...r});
+    });
+    records=[...map.values()].sort((a,b)=>(a.date||"").localeCompare(b.date||"") || (a.time||"").localeCompare(b.time||""));
+    localStorage.setItem(KEY,JSON.stringify(records));
+    render();
+    show("status",`CSV importado: ${incoming.length} filas procesadas.`,"ok");
+  }catch(err){
+    show("status","No se pudo importar CSV: "+err.message,"err");
+  }finally{
+    e.target.value="";
+  }
+};
+
+$("erase").onclick=()=>{if(confirm("¿Borrar todo el historial?")){records=[];localStorage.setItem(KEY,"[]");render()}};
+$("save").onclick=save;$("clear").onclick=()=>clear(true);$("manual").onclick=()=>clear(true);
+document.querySelectorAll("input,select").forEach(e=>e.addEventListener("input",update));
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));document.querySelectorAll(".tabpane").forEach(x=>x.classList.remove("on"));t.classList.add("on");$(t.dataset.tab).classList.add("on")});
+const drop=$("drop");["dragenter","dragover"].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.add("drag")}));["dragleave","drop"].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.remove("drag")}));
+drop.addEventListener("drop",e=>{
+  const dt=new DataTransfer();
+  [...e.dataTransfer.files].filter(f=>{
+    const n=f.name.toLowerCase();
+    return f.type==="application/pdf"||f.type==="image/png"||n.endsWith(".pdf")||n.endsWith(".png");
+  }).forEach(f=>dt.items.add(f));
+  $("files").files=dt.files;
+});
+clear(true);applySettings();render()
+})();
+</script>
+</body>
+</html>
